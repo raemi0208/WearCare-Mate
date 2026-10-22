@@ -15,7 +15,7 @@ Database/
 │   ├── load_to_timestream.py         # FitBit 활동 데이터 적재 스크립트
 │   └── load_sleep_to_timestream.py   # 수면 및 생체 지표 데이터 적재 스크립트
 └── README.md
-
+```
 [AWS Infrastructure Specifications]
 Cloud Region: us-east-2 (AWS Ohio)
 
