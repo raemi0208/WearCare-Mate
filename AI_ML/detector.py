@@ -27,6 +27,9 @@ POP_THRESHOLDS = [(3.0, "high"), (2.5, "medium"), (2.0, "low")]
 # ---- 개인 기준선 (스펙 4번) ----
 WINDOW, MIN_RECORDS, STD_FLOOR = 14, 5, 500.0
 
+# 테이블 컬럼명(wearable_sleep_table_fixed, Fitbit)을 그대로 넘겨도 되도록 별칭 허용
+METRIC_ALIASES = {"sleep_duration_hours": "sleep_hours", "totalsteps": "steps", "total_steps": "steps"}
+
 RANK = {"none": 0, "low": 1, "medium": 2, "high": 3}
 NAME = {v: k for k, v in RANK.items()}
 
@@ -104,7 +107,7 @@ def _overall(anomalies):
 
 def detect(inp, history_steps=None, iforest=None):
     """inp: 스펙 6번 입력 dict. history_steps: 직전 걸음 수 리스트. iforest: 학습된 IsolationForest (선택)."""
-    m = inp.get("metrics", {}) or {}
+    m = {METRIC_ALIASES.get(k, k): v for k, v in (inp.get("metrics", {}) or {}).items()}  # Athena 컬럼명도 받는다
     anomalies, checked = [], 0
 
     pers, pstat = personal_check(m.get("steps"), history_steps or [])

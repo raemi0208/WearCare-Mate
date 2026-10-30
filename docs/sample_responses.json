@@ -1,0 +1,176 @@
+{
+  "_note": "프론트/백엔드 연동용 샘플. 요청은 스펙 6번, 응답은 스펙 7번 형식. guide.lines는 3줄 배열, guide가 null일 수 있음. 응답은 API Gateway 프록시 통합이면 body에 JSON 문자열로 담겨 옴.",
+  "samples": [
+    {
+      "name": "activity_drop_high",
+      "description": "활동량 급감 (개인 기준, high). guide는 Bedrock 실제 호출 결과",
+      "request": {
+        "user_id": "demo-user-1",
+        "date": "2026-10-30",
+        "metrics": {
+          "steps": 2100
+        },
+        "history_steps": [
+          12000,
+          11500,
+          13000,
+          12400,
+          12800,
+          11900,
+          12300
+        ]
+      },
+      "response": {
+        "user_id": "demo-user-1",
+        "date": "2026-10-30",
+        "anomalies": [
+          {
+            "type": "ACTIVITY_DROP",
+            "basis": "personal",
+            "metric": "steps",
+            "value": 2100,
+            "baseline_mean": 12271,
+            "baseline_std": 522,
+            "z_score": -19.49,
+            "drop_pct": -82.9,
+            "severity": "high"
+          }
+        ],
+        "anomaly_score": null,
+        "guide": {
+          "text": "오늘 걸음 수가 평소 12,271보보다 2,100보로 크게 줄었네요.\n오늘부터 매일 10분씩 산책하는 시간을 만들어보세요.\n증상이 지속되거나 불편하면 전문가와 상담해보세요.",
+          "lines": [
+            "오늘 걸음 수가 평소 12,271보보다 2,100보로 크게 줄었네요.",
+            "오늘부터 매일 10분씩 산책하는 시간을 만들어보세요.",
+            "증상이 지속되거나 불편하면 전문가와 상담해보세요."
+          ],
+          "model_id": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "warnings": [],
+          "generated_at": "2026-10-30T14:40:09+09:00"
+        },
+        "model_version": "activity-zscore-v0.2+pop-v0.3",
+        "overall_severity": "high",
+        "status": "anomaly"
+      }
+    },
+    {
+      "name": "sleep_stress_hrv_high",
+      "description": "수면, HRV, 스트레스 복합 (집단 기준). guide 3번째 줄은 규칙 검사를 통과하도록 고친 예시 문구",
+      "request": {
+        "user_id": "demo-user-2",
+        "date": "2026-10-30",
+        "metrics": {
+          "sleep_hours": 3.6,
+          "heart_rate_variability": 28.0,
+          "stress_level": 9.4
+        }
+      },
+      "response": {
+        "user_id": "demo-user-2",
+        "date": "2026-10-30",
+        "anomalies": [
+          {
+            "type": "SLEEP_SHORT",
+            "basis": "population",
+            "metric": "sleep_hours",
+            "value": 3.6,
+            "population_mean": 7.47,
+            "z_score": -2.51,
+            "severity": "medium"
+          },
+          {
+            "type": "HRV_LOW",
+            "basis": "population",
+            "metric": "heart_rate_variability",
+            "value": 28.0,
+            "population_mean": 70.39,
+            "z_score": -2.16,
+            "severity": "low"
+          },
+          {
+            "type": "STRESS_HIGH",
+            "basis": "population",
+            "metric": "stress_level",
+            "value": 9.4,
+            "population_mean": 4.94,
+            "z_score": 2.19,
+            "severity": "low"
+          }
+        ],
+        "anomaly_score": null,
+        "guide": {
+          "text": "오늘 수면 시간이 3.6시간으로 평균 7.5시간보다 크게 부족했고, 심박 변이도는 28.0으로 평균 70.4에 미치지 못했으며, 스트레스 점수는 9.4로 평균 4.9보다 매우 높아요.\n오늘부터 취침 시각을 지금보다 2시간 앞당기고, 자기 전에 5분간 깊게 숨 쉬는 시간을 가져보세요.\n증상이 지속되거나 불편하면 전문가와 상담해보세요.",
+          "lines": [
+            "오늘 수면 시간이 3.6시간으로 평균 7.5시간보다 크게 부족했고, 심박 변이도는 28.0으로 평균 70.4에 미치지 못했으며, 스트레스 점수는 9.4로 평균 4.9보다 매우 높아요.",
+            "오늘부터 취침 시각을 지금보다 2시간 앞당기고, 자기 전에 5분간 깊게 숨 쉬는 시간을 가져보세요.",
+            "증상이 지속되거나 불편하면 전문가와 상담해보세요."
+          ],
+          "model_id": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+          "warnings": [],
+          "generated_at": "2026-10-30T14:40:09+09:00"
+        },
+        "model_version": "activity-zscore-v0.2+pop-v0.3",
+        "overall_severity": "high",
+        "status": "anomaly"
+      }
+    },
+    {
+      "name": "normal",
+      "description": "이상 없음 (guide는 null)",
+      "request": {
+        "user_id": "demo-user-3",
+        "date": "2026-10-30",
+        "metrics": {
+          "steps": 11800,
+          "sleep_hours": 7.2,
+          "stress_level": 4.5
+        },
+        "history_steps": [
+          12000,
+          11500,
+          13000,
+          12400,
+          12800,
+          11900,
+          12300
+        ]
+      },
+      "response": {
+        "user_id": "demo-user-3",
+        "date": "2026-10-30",
+        "anomalies": [],
+        "anomaly_score": null,
+        "guide": null,
+        "model_version": "activity-zscore-v0.2+pop-v0.3",
+        "overall_severity": "none",
+        "status": "normal"
+      }
+    },
+    {
+      "name": "insufficient_data",
+      "description": "걸음 수 기록이 5개 미만이라 개인 기준 판정 불가",
+      "request": {
+        "user_id": "demo-user-4",
+        "date": "2026-10-30",
+        "metrics": {
+          "steps": 2000
+        },
+        "history_steps": [
+          8000,
+          7500,
+          8200
+        ]
+      },
+      "response": {
+        "user_id": "demo-user-4",
+        "date": "2026-10-30",
+        "anomalies": [],
+        "anomaly_score": null,
+        "guide": null,
+        "model_version": "activity-zscore-v0.2+pop-v0.3",
+        "status": "insufficient_data",
+        "overall_severity": "none"
+      }
+    }
+  ]
+}
