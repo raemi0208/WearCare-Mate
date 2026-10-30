@@ -10,7 +10,14 @@
 import json
 import logging
 
-from src.data_source import DataSourceUnavailableError, select_health_data_builder
+from src.dashboard_mock_data import build_ai_guide_mock, build_dashboard_mock
+from src.data_source import (
+    DataSourceNotFoundError,
+    DataSourceRequestError,
+    DataSourceUnavailableError,
+    select_dashboard_builder,
+    select_health_data_builder,
+)
 from src.mock_data import (
     build_anomalies_mock,
     build_guides_mock,
@@ -189,8 +196,18 @@ def _handle_user_resource(event, user_id, mock_builder):
         query = _extract_query(event)
     except ValueError as error:
         return _build_response(400, {"error": "bad_request", "message": str(error)})
-    # 3) 가상(MOCK) 응답 생성 후 200 반환
-    return _build_response(200, mock_builder(user_id, query))
+    # 3) 빌더로 응답 본문 생성 후 200 반환
+    #    데이터 소스가 요청 값을 거절한 경우(DataSourceRequestError)만 400 으로 바꾼다.
+    #    일반 ValueError 등 그 외 예외는 그대로 올라가 lambda_handler 에서 500/503 이 된다.
+    try:
+        body = mock_builder(user_id, query)
+    except DataSourceRequestError as error:
+        # 메시지는 데이터 소스가 만든 고정 문구(사용자 입력값 미포함)이다.
+        return _build_response(400, {"error": "bad_request", "message": str(error)})
+    except DataSourceNotFoundError as error:
+        # REAL 모드에서 허용되지 않은 사용자. 사용자 ID 는 메시지에 넣지 않는다.
+        return _build_response(404, {"error": "not_found", "message": str(error)})
+    return _build_response(200, body)
 
 
 def _route_request(event):
@@ -202,6 +219,7 @@ def _route_request(event):
     처리 흐름:
     1) 이벤트에서 메서드/경로를 꺼낸다. 실패하면 400.
     2) GET /health 면 200 과 상태 JSON 을 반환한다.
+       GET /dashboard, GET /ai-guide 면 예시(MOCK) 대시보드/가이드를 반환한다.
     3) GET /users/{userId}/health-data 면 가상(MOCK) 건강 데이터를 반환한다.
     4) GET /users/{userId}/anomalies 면 가상(MOCK) 이상탐지 결과를 반환한다.
     5) GET /users/{userId}/guides 면 가상(MOCK) 건강 행동 가이드를 반환한다.
@@ -223,9 +241,22 @@ def _route_request(event):
     if method == "GET" and path == "/health":
         return _build_response(200, {"status": "ok", "service": SERVICE_NAME})
 
+    # 2-1) GET /dashboard (프론트엔드 API.md 스키마)
+    #      DATA_SOURCE=mock(기본값)이면 예시 데이터. real 은 아직 미구현이라 503 (MOCK 대체 없음).
+    #      쿼리 파라미터는 사용하지 않는다(userId 등을 보내도 조회 대상에 영향 없음).
+    if method == "GET" and path == "/dashboard":
+        builder = select_dashboard_builder(build_dashboard_mock)
+        return _build_response(200, builder())
+
+    # 2-2) GET /ai-guide (프론트엔드 API.md 의 aiGuide 객체)
+    #      AI/ML(Bedrock) 연동 전이므로 항상 예시 데이터. Bedrock 을 호출하지 않는다.
+    if method == "GET" and path == "/ai-guide":
+        return _build_response(200, build_ai_guide_mock())
+
     # 3) GET /users/{userId}/health-data
     #    DATA_SOURCE 설정으로 빌더를 고른다. 기본값(mock)이면 기존 MOCK 빌더를 쓴다.
-    #    ⚠️ 실제 데이터 소스(real)는 아직 미구현이며, 선택하면 503 이 된다.
+    #    ⚠️ real 은 ENABLE_REAL_DATA_TESTING=true 일 때만 Athena 를 조회한다(개발·통합 테스트 전용).
+    #       스위치가 꺼져 있거나 조회가 실패하면 503 이며, MOCK 으로 대체하지 않는다.
     user_id = _match_user_resource_route(method, path, "health-data")
     if user_id is not None:
         builder = select_health_data_builder(build_health_data_mock)
@@ -262,8 +293,10 @@ def lambda_handler(event, context):
     오류 처리 범위:
         - 400/404 등 예상된 오류는 _route_request() 가 응답으로 return 하므로
           여기서 바뀌지 않는다.
+        - 데이터 소스의 요청 검증 오류(DataSourceRequestError)는
+          _handle_user_resource() 에서 400 으로 return 되므로 여기까지 오지 않는다.
         - DataSourceUnavailableError 만 503 으로 바꾼다.
-          (예: DATA_SOURCE=real 이지만 실제 데이터 조회가 아직 미구현)
+          (예: 실제 데이터 테스트 스위치 꺼짐, Athena 조회 실패·타임아웃)
         - 그 외 Exception 계열의 처리되지 않은 예외는 500 으로 바꾼다.
           DATA_SOURCE 설정 오류(DataSourceConfigError)도 여기에 해당한다.
           (예: MOCK/데이터 처리 중 버그, JSON 직렬화 실패)

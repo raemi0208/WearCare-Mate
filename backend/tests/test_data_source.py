@@ -45,27 +45,46 @@ def make_event(method, path, query="__default__"):
     return event
 
 
-class EnvIsolatedTestCase(unittest.TestCase):
-    """DATA_SOURCE 환경변수를 테스트마다 격리하는 기본 클래스.
+# 테스트마다 지우는 환경변수 (개발 PC 설정이 테스트 결과에 영향을 주지 않도록)
+# - DATA_SOURCE: 데이터 소스 선택
+# - ENABLE_REAL_DATA_TESTING, DASHBOARD_USER_ID: REAL 조회 진입 조건
+# - ATHENA_*: Athena 조회 설정
+_ISOLATED_ENV_NAMES = (DATA_SOURCE_ENV, "ENABLE_REAL_DATA_TESTING", "DASHBOARD_USER_ID")
+_ISOLATED_ENV_PREFIXES = ("ATHENA_",)
 
-    - setUp 에서 os.environ 전체를 patch.dict 로 감싸고 DATA_SOURCE 를 지운다.
-      (개발자 PC 에 DATA_SOURCE 가 설정되어 있어도 테스트 결과가 바뀌지 않게 함)
+
+def _is_isolated_env(name):
+    return name in _ISOLATED_ENV_NAMES or name.startswith(_ISOLATED_ENV_PREFIXES)
+
+
+def _snapshot_isolated_env():
+    return {name: value for name, value in os.environ.items() if _is_isolated_env(name)}
+
+
+class EnvIsolatedTestCase(unittest.TestCase):
+    """데이터 소스 관련 환경변수를 테스트마다 격리하는 기본 클래스.
+
+    - setUp 에서 os.environ 전체를 patch.dict 로 감싸고, 관련 환경변수
+      (DATA_SOURCE, ENABLE_REAL_DATA_TESTING, DASHBOARD_USER_ID, ATHENA_*)를 모두 지운다.
+      (개발자 PC 에 이 값들이 설정되어 있어도 테스트 결과가 바뀌지 않게 함)
     - 테스트가 끝나면 patch.dict 가 원래 환경변수로 복원한다.
-    - 복원 후 DATA_SOURCE 가 테스트 전과 같은지도 확인한다.
+    - 복원 후 관련 환경변수가 테스트 전과 같은지도 확인한다.
     """
 
     def setUp(self):
-        original = os.environ.get(DATA_SOURCE_ENV)
+        original = _snapshot_isolated_env()
         # cleanup 은 등록 역순으로 실행된다 → 이 확인이 patch 복원 '이후'에 실행됨
         self.addCleanup(self._assert_env_restored, original)
 
         patcher = mock.patch.dict(os.environ)
         patcher.start()
         self.addCleanup(patcher.stop)
-        os.environ.pop(DATA_SOURCE_ENV, None)
+        for name in list(os.environ):
+            if _is_isolated_env(name):
+                del os.environ[name]
 
     def _assert_env_restored(self, original):
-        self.assertEqual(os.environ.get(DATA_SOURCE_ENV), original)
+        self.assertEqual(_snapshot_isolated_env(), original)
 
     def set_data_source(self, value):
         """현재 테스트 안에서만 DATA_SOURCE 를 설정한다."""

@@ -1,6 +1,7 @@
 # WearCare Mate 백엔드 REST API 명세 (초안)
 
 > 상태: **초안(Draft)** · 작성: 파트3 백엔드/인프라 담당
+> 갱신: `/dashboard`, `/ai-guide`(프론트 API.md 기준) 추가, Athena REAL 모드(로컬 검증만) 반영
 > 목적: 프론트엔드 · 데이터 · AI/ML 팀과 협의하기 위한 API 계약(Contract) 초안
 
 이 문서는 아직 **확정본이 아닙니다.** 팀 협의로 바뀔 수 있으며,
@@ -94,10 +95,17 @@
 | # | 메서드 | 경로                                              | 목적                 | 상태            | 주요 의존 파트     |
 | - | ------ | ------------------------------------------------- | -------------------- | --------------- | ------------------ |
 | 1 | GET    | `/health`                                         | 서버 상태 확인       | 🟢 구현 완료     | 백엔드             |
-| 2 | GET    | `/users/{userId}/health-data`                     | 건강 데이터 조회     | 🟡 초안          | 데이터(Timestream) |
-| 3 | GET    | `/users/{userId}/anomalies`                       | 이상탐지 결과 조회   | 🟡 초안          | AI/ML(SageMaker)   |
-| 4 | GET    | `/users/{userId}/guides`                          | 건강 행동 가이드 조회 | 🟡 초안          | AI/ML(Bedrock)     |
+| 2 | GET    | `/users/{userId}/health-data`                     | 건강 데이터 조회     | 🟢 MOCK / 🟡 REAL(로컬 검증만) | 데이터(Athena) |
+| 3 | GET    | `/users/{userId}/anomalies`                       | 이상탐지 결과 조회   | 🟢 MOCK 구현     | AI/ML(SageMaker)   |
+| 4 | GET    | `/users/{userId}/guides`                          | 건강 행동 가이드 조회 | 🟢 MOCK 구현     | AI/ML(Bedrock)     |
 | 5 | POST   | `/users/{userId}/notifications/subscriptions`     | 알림 수신 등록       | 🟡 설계 후보     | 백엔드(SNS)        |
+| 6 | GET    | `/dashboard`                                      | 대시보드 전체 (프론트 API.md) | 🟢 MOCK / 🟡 REAL 걸음 수(로컬 검증만) | 프론트·데이터·AI/ML |
+| 7 | GET    | `/ai-guide`                                       | AI 가이드 (프론트 API.md) | 🟢 MOCK 구현 | AI/ML(Bedrock)     |
+
+> 🟡 **REAL(로컬 검증만)**: Athena 조회 코드는 구현했지만 가짜 클라이언트로만 테스트했으며,
+> 실제 AWS Athena 조회는 아직 실행·검증하지 않았습니다. 데이터 저장소는 Athena(us-east-2,
+> 테이블 `fitbit_activity_table`, 모든 컬럼 string)로 콘솔에서 확인되었습니다.
+> REAL 모드는 개발·통합 테스트 전용이며 인증·인가가 없는 공개 환경에서는 켜지 않습니다. (4.6절 참고)
 
 ---
 
@@ -308,10 +316,64 @@
 
 ---
 
+### 4.6 GET /dashboard — 대시보드 전체 (🟢 MOCK / 🟡 REAL 걸음 수)
+
+- **목적**: 프론트엔드 대시보드 화면 전체를 한 번에 채운다.
+- **스키마 기준**: 🟢 프론트엔드 `API.md` 의 JSON 스키마를 그대로 따른다. 필드 이름·타입을 바꾸지 않는다.
+  최상위 키: `user`, `summaryStats`, `timeseries`, `sleepStages`, `anomalies`, `aiGuide`, `notifications`
+- **요청 파라미터**: 없음. 쿼리를 보내도 사용하지 않는다. (`userId` 를 보내도 조회 대상이 바뀌지 않음)
+- **MOCK 모드** (`DATA_SOURCE` 미설정 또는 `mock`): 전 항목 예시 데이터.
+  실제 결과로 오인되지 않도록 화면에 보이는 문자열에 표시한다.
+  (`user.name="예시 사용자"`, `deltaLabel="예시 데이터"`, `title` 앞 `[예시]`,
+  `aiGuide.model="MOCK · 실제 AI 생성 아님"`, 가이드 본문에 의료 면책 문구)
+- **REAL 모드** (개발·통합 테스트 전용, 🟡 로컬 검증만):
+  - 진입 조건: `DATA_SOURCE=real` + `ENABLE_REAL_DATA_TESTING=true` + `DASHBOARD_USER_ID`
+  - 조회 대상: `DASHBOARD_USER_ID` 사용자 1명 (요청에서 사용자를 받지 않음)
+  - ⚠️ `DASHBOARD_USER_ID` 는 개발용 데모 대상 지정일 뿐 인증·인가를 대신하지 않는다.
+
+  | 항목 | REAL 모드 내용 |
+  | ---- | -------------- |
+  | `summaryStats` | steps 카드 1개만 (Athena 실제 데이터). 수면·심박·점수 카드는 넣지 않음 |
+  | `timeseries.steps` | Athena 실제 데이터. 기준 주 중 데이터가 있는 날만 (7개보다 적을 수 있음) |
+  | `timeseries.sleep` / `heartRate` | `[]` (데이터 없음, 임의 수치 생성 안 함) |
+  | `sleepStages` | `{"totalLabel": "데이터 없음", "segments": []}` |
+  | `user` | 개발용 데모 표시 문구 (사용자 ID 미포함) |
+  | `anomalies` / `aiGuide` / `notifications` | `[예시]` 표시가 있는 MOCK (AI/ML·SNS 연동 전) |
+
+- **걸음 수 통계 규칙 (🟡 임시 처리 방식)**
+  - 기준 주: 걸음 수가 있는 가장 최근 날짜가 속한 주(월~일). Fitbit 데이터가 2016년이므로 오늘 기준이 아님.
+    `deltaLabel` 에 기준 주 기간(`YYYY-MM-DD ~ YYYY-MM-DD`)을 표시.
+  - `value`: 기준 주에서 데이터가 있는 날만의 하루 평균, 정수 반올림 + 천 단위 콤마 (`"7,929"`).
+    데이터가 없는 날을 0걸음으로 보지 않음.
+  - `delta`: 지난주 대비 %, 정수 반올림. 지난주 데이터가 없거나 지난주 평균이 0이면 `null`.
+    ⚠️ API.md 의 `delta` 타입(number)과 다름 — 프론트 확인 필요. 0 으로 채우지 않음.
+  - `timeseries.steps[].anomaly`: AI/ML 연동 전이므로 항상 `false`.
+- **상태 코드**: 200 / 404(메서드·경로 불일치) / 500(설정 오류) / 503(스위치 꺼짐, Athena 실패·타임아웃,
+  조회 결과가 최대 행 수에 도달). REAL 실패 시 MOCK 으로 대체하지 않는다.
+- **합의 필요 사항**: 아래 6장 "프론트엔드 파트에게" 참고.
+
+---
+
+### 4.7 GET /ai-guide — AI 가이드 (🟢 MOCK)
+
+- **목적**: 대시보드의 "가이드 다시 생성" 버튼.
+- **스키마**: 🟢 `/dashboard` 의 `aiGuide` 객체와 동일 — `{model, updatedAt, headline, text, actions[]}`
+- **현재 동작**: AI/ML(Bedrock) 연동 전이므로 `DATA_SOURCE` 와 관계없이 항상 예시 가이드를 반환한다.
+  Bedrock 을 호출하지 않는다. `model` 은 `"MOCK · 실제 AI 생성 아님"`.
+- **합의 필요 사항**: 실제 연동 시 매 요청마다 생성 비용이 들 수 있으므로 POST 전환·요청 제한 여부,
+  ML 출력(`guide.text` 3줄)을 `headline/text/actions` 로 나누는 방식.
+
+---
+
 ## 5. 확정된 사실 vs 미확정 요약
 
 ### 🟢 확정된 사실
-- `GET /health` 는 구현·테스트 완료 (200/404/400 동작, unittest 6개 통과).
+- `GET /health` 는 구현·테스트 완료 (200/404/400 동작).
+- 구현된 엔드포인트 6개(`/health`, health-data, anomalies, guides, `/dashboard`, `/ai-guide`)는
+  로컬 unittest 272개로 검증됨. AWS 배포와 실제 Athena 조회는 아직 하지 않음.
+- 데이터 저장소는 Athena(us-east-2, `fitbit_activity_table`)로 확인됨. 수면·심박 데이터는 없음.
+- REAL 모드는 `ENABLE_REAL_DATA_TESTING` + `DASHBOARD_USER_ID` 가 필요한 개발·통합 테스트 전용이며,
+  health-data REAL 은 `DASHBOARD_USER_ID` 와 다른 사용자를 404 로 거절함.
 - 이벤트 형식은 API Gateway HTTP API payload 2.0.
 - 응답은 JSON, 오류는 `{error, message}` 형태.
 - 실제 샘플 데이터 컬럼(FitBit/수면 CSV)과 README의 아키텍처·파트 분배.
@@ -344,6 +406,14 @@
 ### 프론트엔드 파트에게
 8. 조회 API의 기본 기간·페이지네이션·필터는 어떤 UX를 전제로 하나요?
 9. 오류 응답에 `requestId`/`timestamp` 확장이 필요한가요?
+9-1. (`/dashboard`) 지난주 데이터가 없을 때 `summaryStats[].delta` 를 `null` 로 보내도 화면이 정상인가요?
+     (API.md 는 number. 0 은 '변동없음'으로 보이므로 쓰지 않음)
+9-2. (`/dashboard`) `timeseries.steps` 가 7개보다 적거나, `sleep`/`heartRate` 가 빈 배열일 때 차트가 정상인가요?
+9-3. (`/dashboard`) `sleepStages.segments` 가 빈 배열(합계 100 아님)이거나 `summaryStats` 가 1개일 때 괜찮은가요?
+9-4. (`/dashboard`) 항목별 출처 표시용 선택 필드 `meta.dataSources` 를 추가해도 되나요? (현재 미포함)
+9-5. (`/dashboard`) `deltaLabel` 에 기준 주 기간(2016년 날짜)을 넣는 방식이 괜찮은가요?
+9-6. (`/ai-guide`) 의료 면책 문구 위치 — `text` 끝(현재) vs 선택 필드 `disclaimer`.
+9-7. Amplify 배포 도메인 (CORS 설정용).
 
 ### 팀 공통 (백엔드 주도)
 10. 인증·인가 방식(예: Cognito/JWT)을 도입하나요? `userId` 접근 통제는 어떻게 하나요?

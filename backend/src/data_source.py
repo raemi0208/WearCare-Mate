@@ -6,16 +6,17 @@
     ----------------------  ------------------------------------------------
     (설정 안 함)             mock  → 기존 MOCK 빌더 사용 (기본값)
     "mock"                  mock  → 기존 MOCK 빌더 사용
-    "real"                  실제 데이터 소스 → 아직 미구현.
-                            빌더를 호출하면 DataSourceUnavailableError 발생
-                            (MOCK 데이터로 대체하지 않음)
+    "real"                  real_health_data.build_real_health_data 사용 (Athena 조회)
+                            단, ENABLE_REAL_DATA_TESTING=true 가 함께 설정되지 않으면
+                            빌더 호출 시 DataSourceUnavailableError (503)
+                            (임시 개발 장치. 실패해도 MOCK 데이터로 대체하지 않음)
     그 외 값 / 빈 문자열     DataSourceConfigError 발생 (MOCK 으로 조용히 바꾸지 않음)
 
     값의 앞뒤 공백과 대소문자는 무시합니다. 예) " MOCK " → "mock"
 
 설계 원칙:
-    - 이 모듈은 Athena/Timestream 등 특정 저장소 코드를 담지 않습니다.
-      (저장소 종류가 아직 확정되지 않았기 때문)
+    - 이 모듈은 데이터 소스를 "선택"만 합니다. Athena 조회 코드는
+      real_health_data.py / athena_repository.py 에 있으며, real 일 때만 불러옵니다.
     - mock_data 를 직접 import 하지 않고, 호출하는 쪽에서 MOCK 빌더를 넘겨받습니다.
       이렇게 하면 이 모듈이 MOCK 구현에 묶이지 않고 테스트에서 바꿔 끼우기도 쉽습니다.
     - 환경변수는 import 시점이 아니라 "호출할 때마다" 읽습니다.
@@ -35,9 +36,33 @@ VALID_DATA_SOURCES = (DATA_SOURCE_MOCK, DATA_SOURCE_REAL)
 class DataSourceUnavailableError(Exception):
     """데이터 소스를 사용할 수 없을 때 발생하는 예외.
 
-    현재는 DATA_SOURCE=real 이지만 실제 데이터 조회가 아직 구현되지 않은 경우에 쓴다.
+    예) DATA_SOURCE=real 이지만 ENABLE_REAL_DATA_TESTING 이 꺼져 있음,
+        AWS 조회 실패, 쿼리 실패/취소, 타임아웃
     lambda_function 은 이 예외만 HTTP 503 으로 바꾸고,
     외부 응답에는 고정 문구만 내보낸다. (이 예외의 메시지는 노출하지 않음)
+    """
+
+
+class DataSourceRequestError(Exception):
+    """데이터 소스가 사용자 요청 값을 받아들일 수 없을 때 발생하는 예외.
+
+    예) 숫자가 아닌 userId, 잘못된 날짜 형식, from 이 to 보다 늦은 날짜 범위
+    lambda_function 은 이 예외만 HTTP 400 으로 바꾼다.
+
+    ⚠️ ValueError 를 상속하지 않는다. 일반적인 ValueError(데이터 처리 버그 등)는
+       기존처럼 500 으로 처리되어야 하기 때문이다.
+    ⚠️ 메시지는 응답에 그대로 쓰이므로, 사용자 입력값이나 건강 데이터를 넣지 않는다.
+    """
+
+
+class DataSourceNotFoundError(Exception):
+    """요청한 대상의 데이터를 이 데이터 소스에서 제공할 수 없을 때 발생하는 예외.
+
+    예) REAL 모드에서 DASHBOARD_USER_ID 와 다른 사용자 ID 를 요청한 경우
+    lambda_function 은 이 예외만 HTTP 404 로 바꾼다.
+    (403 이 아니라 404 로 응답해, 어떤 사용자 ID 가 존재하는지 알 수 없게 한다)
+
+    ⚠️ 메시지는 응답에 쓰이므로 사용자 ID 를 넣지 않는다.
     """
 
 
@@ -77,20 +102,14 @@ def get_data_source_name():
     return value
 
 
-def _real_health_data_not_implemented(user_id, query):
-    """실제 데이터 소스용 빌더 자리. 아직 구현되지 않았음을 알리는 예외를 던진다.
-
-    MOCK 빌더와 같은 (user_id, query) 형태를 가지므로, 나중에 실제 조회 함수로
-    이 함수만 바꾸면 된다.
-    """
-    raise DataSourceUnavailableError("실제 데이터 소스가 아직 구현되지 않았습니다.")
-
-
 def select_health_data_builder(mock_builder):
     """DATA_SOURCE 설정에 맞는 health-data 빌더를 돌려준다.
 
     빌더는 (user_id, query) 를 받아 응답 본문 dict 를 돌려주는 함수다.
-    "real" 일 때는 빌더를 고르는 시점이 아니라 "호출하는 시점"에 예외가 난다.
+    - mock(기본값): 넘겨받은 MOCK 빌더
+    - real: real_health_data.build_real_health_data
+      ENABLE_REAL_DATA_TESTING=true 가 아니면 호출 시 503 이 된다. (임시 개발 장치)
+    "real" 의 오류는 빌더를 고르는 시점이 아니라 "호출하는 시점"에 난다.
     그래서 빈 userId(400)나 잘못된 쿼리(400) 같은 요청 검증은 기존처럼 먼저 이루어진다.
 
     Args:
@@ -104,4 +123,28 @@ def select_health_data_builder(mock_builder):
     """
     if get_data_source_name() == DATA_SOURCE_MOCK:
         return mock_builder
-    return _real_health_data_not_implemented
+
+    # real 일 때만 불러온다. (순환 import 방지 + MOCK 모드에서는 Athena 코드를 불러오지 않음)
+    from src.real_health_data import build_real_health_data
+
+    return build_real_health_data
+
+
+def select_dashboard_builder(mock_builder):
+    """DATA_SOURCE 설정에 맞는 /dashboard 빌더를 돌려준다. 빌더는 인자 없이 호출한다.
+
+    - mock(기본값): 넘겨받은 MOCK 빌더
+    - real: dashboard_data.build_real_dashboard (걸음 수만 Athena 실제 데이터)
+      ENABLE_REAL_DATA_TESTING=true 와 DASHBOARD_USER_ID 가 없으면 호출 시 503/500.
+      실패해도 MOCK 으로 대체하지 않는다.
+
+    Raises:
+        DataSourceConfigError: DATA_SOURCE 값이 잘못되었을 때.
+    """
+    if get_data_source_name() == DATA_SOURCE_MOCK:
+        return mock_builder
+
+    # real 일 때만 불러온다. (순환 import 방지 + MOCK 모드에서는 Athena 코드를 불러오지 않음)
+    from src.dashboard_data import build_real_dashboard
+
+    return build_real_dashboard
