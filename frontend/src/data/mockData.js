@@ -156,3 +156,59 @@ export const notifications = [
     time: "2일 전",
   },
 ];
+
+// 연결된 웨어러블 기기 (기기 연동 페이지)
+export const devices = [
+  {
+    id: "d1",
+    name: "Galaxy Watch 6",
+    type: "스마트워치",
+    icon: "⌚",
+    status: "connected", // connected | syncing | disconnected
+    battery: 82,
+    lastSync: "2분 전",
+    metrics: ["심박", "수면", "활동량", "SpO2"],
+  },
+  {
+    id: "d2",
+    name: "Galaxy Ring",
+    type: "스마트링",
+    icon: "💍",
+    status: "connected",
+    battery: 45,
+    lastSync: "10분 전",
+    metrics: ["수면", "심박", "체온"],
+  },
+  {
+    id: "d3",
+    name: "Withings Scale",
+    type: "체성분계",
+    icon: "⚖️",
+    status: "disconnected",
+    battery: null,
+    lastSync: "3일 전",
+    metrics: ["체중", "체지방"],
+  },
+];
+
+// AI 가이드 생성 히스토리 (AI 가이드 페이지)
+export const guideHistory = [
+  {
+    id: "g1",
+    date: "오늘 · 오전 9:12",
+    headline: "수면·심박 이상 징후, 가벼운 회복 루틴으로 돌봐보세요.",
+    tag: "회복 권장",
+  },
+  {
+    id: "g2",
+    date: "어제 · 오전 8:40",
+    headline: "활동량이 꾸준해요. 수분 섭취만 조금 더 신경 써보세요.",
+    tag: "유지",
+  },
+  {
+    id: "g3",
+    date: "2일 전 · 오전 8:55",
+    headline: "주말 수면 패턴이 흐트러졌어요. 기상 시간을 일정하게 맞춰보세요.",
+    tag: "수면 관리",
+  },
+];

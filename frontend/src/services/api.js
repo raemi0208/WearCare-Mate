@@ -14,9 +14,18 @@ import {
   anomalies,
   aiGuide,
   notifications,
+  devices,
+  guideHistory,
 } from "../data/mockData";
+import { loadProfile, saveProfile } from "./profileStorage";
 
 const API_BASE = process.env.REACT_APP_API_BASE || "";
+
+// 기본 사용자 정보에 브라우저에 저장된 프로필을 덮어씀
+function resolveUser(baseUser) {
+  const saved = loadProfile();
+  return saved ? { ...baseUser, ...saved } : baseUser;
+}
 
 // 네트워크 지연을 흉내 내 로딩 상태를 확인할 수 있게 함
 function delay(data, ms = 350) {
@@ -35,9 +44,9 @@ async function request(path, fallback) {
   return res.json();
 }
 
-export function fetchDashboard() {
+export async function fetchDashboard() {
   // 실제로는 /dashboard 같은 단일 엔드포인트로 합칠 수 있음
-  return request("/dashboard", {
+  const res = await request("/dashboard", {
     user,
     summaryStats,
     timeseries,
@@ -45,10 +54,21 @@ export function fetchDashboard() {
     anomalies,
     aiGuide,
     notifications,
+    devices,
+    guideHistory,
   });
+  // 프로필은 DB가 아닌 브라우저 localStorage 값을 우선 반영
+  return { ...res, user: resolveUser(res.user) };
 }
 
 export function fetchAiGuide() {
   // Bedrock 재생성 트리거용 (현재는 목)
   return request("/ai-guide", aiGuide);
+}
+
+// 프로필 정보 업데이트
+// 데이터베이스를 거치지 않고 브라우저 localStorage에 저장합니다.
+export function updateProfile(profile) {
+  saveProfile(profile);
+  return delay(profile, 300);
 }

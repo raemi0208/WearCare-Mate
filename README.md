@@ -104,6 +104,11 @@ REACT_APP_API_BASE=https://your-api-gateway-url
 3. **AI 가이드 생성** — Amazon Bedrock이 맞춤형 행동 가이드 생성
 4. **알림 및 웹 서빙** — Amazon SNS 푸시 알림, AWS Amplify 웹 대시보드(본 저장소)를 통한 결과 확인
 
+## 문서
+
+- [API 명세 (백엔드 연동용)](docs/API.md)
+- [변경 이력](docs/CHANGELOG.md)
+
 ## 담당
 
 헬스케어 3조 — 백엔드 & 프론트엔드 파트 (웹 대시보드 UI)

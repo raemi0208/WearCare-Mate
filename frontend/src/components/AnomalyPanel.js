@@ -8,8 +8,30 @@ const SEVERITY_LABEL = {
   ok: "정상",
 };
 
-export default function AnomalyPanel({ anomalies = [] }) {
+export default function AnomalyPanel({ anomalies = [], embedded = false }) {
   const alertCount = anomalies.filter((a) => a.severity !== "ok").length;
+
+  const list = (
+    <div className="anomaly-list">
+      {anomalies.map((a) => (
+        <div key={a.id} className="anomaly-item">
+          <span className={`anomaly-item__dot is-${a.severity}`} />
+          <div className="anomaly-item__body">
+            <div className="anomaly-item__title">
+              <span>{a.title}</span>
+              <span className="anomaly-item__time">{a.time}</span>
+            </div>
+            <p className="anomaly-item__desc">{a.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // 다른 Card 안에 삽입될 때는 리스트만 렌더
+  if (embedded) {
+    return list;
+  }
 
   return (
     <Card
@@ -21,20 +43,7 @@ export default function AnomalyPanel({ anomalies = [] }) {
         </Badge>
       }
     >
-      <div className="anomaly-list">
-        {anomalies.map((a) => (
-          <div key={a.id} className="anomaly-item">
-            <span className={`anomaly-item__dot is-${a.severity}`} />
-            <div className="anomaly-item__body">
-              <div className="anomaly-item__title">
-                <span>{a.title}</span>
-                <span className="anomaly-item__time">{a.time}</span>
-              </div>
-              <p className="anomaly-item__desc">{a.desc}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      {list}
     </Card>
   );
 }

@@ -654,3 +654,286 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== 추이 분석 페이지 ===== */
+.trend-stats {
+  display: flex;
+  gap: var(--space-6);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.trend-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trend-stat__label {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.trend-stat__value {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.trend-stat__unit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+  margin-left: 3px;
+}
+
+/* ===== AI 가이드 히스토리 ===== */
+.history-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.history-item {
+  padding: var(--space-4) 0;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.history-item:first-child {
+  padding-top: 0;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.history-item__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: 6px;
+}
+
+.history-item__date {
+  font-size: 12px;
+  color: var(--color-faint);
+}
+
+.history-item__headline {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+/* ===== 기기 연동 페이지 ===== */
+.device-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.device-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+
+.device-item__icon {
+  flex-shrink: 0;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+}
+
+.device-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.device-item__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.device-item__meta {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-top: 3px;
+}
+
+.device-item__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-3);
+}
+
+.device-item__chip {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+}
+
+.add-device-btn {
+  width: 100%;
+  padding: var(--space-5);
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s ease;
+}
+
+.add-device-btn:hover {
+  background: var(--color-panel);
+}
+
+/* ===== 폼 (설정 페이지) ===== */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.form__row {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.form__field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.form__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-soft);
+}
+
+.form__input {
+  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.form__input:focus {
+  border-color: var(--color-ink);
+}
+
+.form__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.form__saved {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ok);
+}
+
+.btn {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-2);
+}
+
+.btn--primary {
+  background: var(--color-ink);
+  color: #fff;
+  border-color: var(--color-ink);
+}
+
+.btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== 토글 리스트 ===== */
+.toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.toggle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  cursor: pointer;
+}
+
+.toggle-item__title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.toggle-item__desc {
+  display: block;
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+
+.toggle-item input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-ink);
+  flex-shrink: 0;
+}
+
+/* ===== 사용자 칩 클릭 가능 ===== */
+.user-chip--button {
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.user-chip--button:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.user-chip__caret {
+  font-size: 10px;
+  color: var(--color-muted);
+  margin-left: 2px;
+}

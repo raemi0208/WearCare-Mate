@@ -3,14 +3,43 @@ import "./App.css";
 
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
-import StatCard from "./components/ui/StatCard";
-import TrendChart from "./components/TrendChart";
-import SleepStages from "./components/SleepStages";
-import AnomalyPanel from "./components/AnomalyPanel";
-import AiGuide from "./components/AiGuide";
-import Notifications from "./components/Notifications";
+
+import DashboardPage from "./pages/DashboardPage";
+import TrendsPage from "./pages/TrendsPage";
+import AnomalyPage from "./pages/AnomalyPage";
+import GuidePage from "./pages/GuidePage";
+import DevicesPage from "./pages/DevicesPage";
+import SettingsPage from "./pages/SettingsPage";
 
 import { fetchDashboard, fetchAiGuide } from "./services/api";
+
+// 각 페이지의 상단 제목/부제목
+const PAGE_META = {
+  dashboard: {
+    title: "건강 대시보드",
+    subtitle: "최근 7일 웨어러블 데이터 분석 · 실시간 모니터링",
+  },
+  trends: {
+    title: "추이 분석",
+    subtitle: "수면 · 심박 · 활동량 시계열 상세 추이",
+  },
+  anomaly: {
+    title: "이상 탐지",
+    subtitle: "Amazon SageMaker 기반 이상 패턴 분석",
+  },
+  guide: {
+    title: "AI 건강 가이드",
+    subtitle: "Amazon Bedrock 생성형 AI 맞춤 가이드",
+  },
+  devices: {
+    title: "기기 연동",
+    subtitle: "연결된 웨어러블 기기 및 데이터 수집 상태",
+  },
+  settings: {
+    title: "설정",
+    subtitle: "프로필 정보 및 알림 설정",
+  },
+};
 
 function App() {
   const [data, setData] = useState(null);
@@ -48,45 +77,65 @@ function App() {
       .finally(() => setRegenerating(false));
   }, []);
 
+  const handleProfileSaved = useCallback((updatedUser) => {
+    setData((prev) => (prev ? { ...prev, user: updatedUser } : prev));
+  }, []);
+
+  const meta = PAGE_META[activeNav] || PAGE_META.dashboard;
+
+  function renderPage() {
+    if (!data) return null;
+    const common = { data };
+    switch (activeNav) {
+      case "trends":
+        return <TrendsPage {...common} />;
+      case "anomaly":
+        return <AnomalyPage {...common} />;
+      case "guide":
+        return (
+          <GuidePage
+            {...common}
+            onRegenerate={handleRegenerate}
+            regenerating={regenerating}
+          />
+        );
+      case "devices":
+        return <DevicesPage {...common} />;
+      case "settings":
+        return (
+          <SettingsPage
+            user={data.user}
+            onProfileSaved={handleProfileSaved}
+          />
+        );
+      case "dashboard":
+      default:
+        return (
+          <DashboardPage
+            {...common}
+            onRegenerate={handleRegenerate}
+            regenerating={regenerating}
+          />
+        );
+    }
+  }
+
   return (
     <div className="app">
       <Sidebar active={activeNav} onSelect={setActiveNav} />
 
       <div className="main">
-        <Topbar user={data?.user} />
+        <Topbar
+          user={data?.user}
+          title={meta.title}
+          subtitle={meta.subtitle}
+          onProfileClick={() => setActiveNav("settings")}
+        />
 
         <div className="content">
           {loading && <LoadingState />}
           {error && <ErrorState message={error} />}
-
-          {data && !loading && !error && (
-            <>
-              {/* 요약 통계 */}
-              <div className="grid grid--stats">
-                {data.summaryStats.map((s) => (
-                  <StatCard key={s.id} {...s} />
-                ))}
-              </div>
-
-              {/* 메인: 좌측 차트/이상탐지, 우측 AI가이드/알림 */}
-              <div className="grid grid--main">
-                <div className="grid">
-                  <TrendChart timeseries={data.timeseries} />
-                  <SleepStages sleepStages={data.sleepStages} />
-                  <AnomalyPanel anomalies={data.anomalies} />
-                </div>
-
-                <div className="grid">
-                  <AiGuide
-                    guide={data.aiGuide}
-                    onRegenerate={handleRegenerate}
-                    regenerating={regenerating}
-                  />
-                  <Notifications notifications={data.notifications} />
-                </div>
-              </div>
-            </>
-          )}
+          {data && !loading && !error && renderPage()}
         </div>
       </div>
     </div>

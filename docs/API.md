@@ -20,6 +20,10 @@
 | `GET` | `/dashboard` | 대시보드 전체 데이터 한 번에 조회 | Timestream 조회 + SageMaker 결과 + Bedrock 가이드 취합 |
 | `GET` | `/ai-guide` | AI 건강 가이드만 재생성 | Bedrock 재호출 |
 
+> **프로필은 백엔드 API를 쓰지 않습니다.** 사용자 프로필 정보는 데이터베이스를 거치지 않고
+> 브라우저 `localStorage`(키: `wearcare.profile`)에 저장됩니다. (`frontend/src/services/profileStorage.js`)
+> 아래 `PUT /profile` 섹션은 추후 서버 저장이 필요해질 경우를 대비한 참고용 스펙입니다.
+
 ---
 
 ## 1. `GET /dashboard`
@@ -91,6 +95,30 @@
   // SNS 푸시 알림 내역
   "notifications": [
     { "id": "n1", "icon": "🔔", "title": "알림 내용", "time": "방금 전" }
+  ],
+
+  // 연결된 웨어러블 기기 (기기 연동 페이지)
+  "devices": [
+    {
+      "id": "d1",
+      "name": "Galaxy Watch 6",
+      "type": "스마트워치",
+      "icon": "⌚",
+      "status": "connected",        // "connected" | "syncing" | "disconnected"
+      "battery": 82,                 // 0~100, 없으면 null
+      "lastSync": "2분 전",
+      "metrics": ["심박", "수면", "활동량", "SpO2"]
+    }
+  ],
+
+  // AI 가이드 생성 히스토리 (AI 가이드 페이지)
+  "guideHistory": [
+    {
+      "id": "g1",
+      "date": "오늘 · 오전 9:12",
+      "headline": "가이드 한 줄 요약",
+      "tag": "회복 권장"
+    }
   ]
 }
 ```
@@ -157,6 +185,26 @@
 | `title` | string | 알림 내용 |
 | `time` | string | 수신 시점 표시용 문자열 |
 
+#### `devices[]`
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | string | 고유 key |
+| `name` | string | 기기 이름 |
+| `type` | string | 기기 종류 (스마트워치 등) |
+| `icon` | string | 아이콘(이모지) |
+| `status` | string | `connected` / `syncing` / `disconnected` |
+| `battery` | number\|null | 배터리 잔량(0~100). 없으면 `null` |
+| `lastSync` | string | 마지막 동기화 시점 표시용 문자열 |
+| `metrics` | string[] | 해당 기기가 수집하는 지표 목록 |
+
+#### `guideHistory[]`
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `id` | string | 고유 key |
+| `date` | string | 가이드 생성 시점 표시용 문자열 |
+| `headline` | string | 가이드 한 줄 요약 |
+| `tag` | string | 분류 태그 (회복 권장, 유지 등) |
+
 ---
 
 ## 2. `GET /ai-guide`
@@ -176,6 +224,38 @@ AI 건강 가이드만 다시 생성합니다. (대시보드의 "가이드 다�
   "actions": ["실천 항목 1", "실천 항목 2"]
 }
 ```
+
+---
+
+## 3. `PUT /profile` (현재 미사용 · 참고용)
+
+설정 페이지에서 수정한 사용자 프로필을 저장합니다.
+
+> **현재 프론트는 이 API를 호출하지 않고 브라우저 `localStorage`에 저장합니다.**
+> 나중에 여러 기기 간 동기화나 서버 보관이 필요해지면, 아래 스펙으로 서버 저장을
+> 추가하고 `updateProfile()`에서 이 엔드포인트를 호출하도록 전환하면 됩니다.
+
+### 요청 본문
+
+```jsonc
+{
+  "name": "김웨어",
+  "age": "33",                 // 문자열 또는 숫자
+  "gender": "남성",            // "남성" | "여성" | "기타" | ""
+  "height": "172",             // cm
+  "weight": "68",              // kg
+  "goal": "balanced",          // "balanced" | "sleep" | "activity" | "recovery"
+  "notifyAnomaly": true,       // 이상 패턴 알림 수신 여부
+  "notifyGuide": true,         // AI 가이드 알림 수신 여부
+  "meta": "33세 · 남성",        // 표시용 메타 문구 (프론트에서 재생성해 전송)
+  "initial": "김"              // 아바타 글자 (프론트에서 이름 첫 글자로 전송)
+}
+```
+
+### 응답
+
+저장된 사용자 객체를 반환합니다. 프론트는 이 응답으로 상단 프로필 표시를 즉시 갱신합니다.
+(목 모드에서는 요청 본문을 그대로 반환합니다.)
 
 ---
 
