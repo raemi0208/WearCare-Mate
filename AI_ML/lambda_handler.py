@@ -3,7 +3,7 @@
 API Gateway(프록시 통합) 또는 직접 호출의 입력(스펙 6번)을 받아 출력(스펙 7번)을 돌려준다.
 배포 파일: lambda_handler.py + detector.py (외부 라이브러리 없음, boto3는 Lambda 기본 포함).
 환경 변수
-  BEDROCK_MODEL_ID  Haiku 4.5 모델 ID 또는 추론 프로파일 ID (서울 리전에서 쓰는 값을 확인해서 설정, 비우면 가이드 생략)
+  BEDROCK_MODEL_ID  기본값 global.anthropic.claude-haiku-4-5-20251001-v1:0 (서울에서 노트북 호출 확인함). 빈 문자열로 두면 가이드 생략
   BEDROCK_REGION    기본 ap-northeast-2
 필요 권한: bedrock:InvokeModel (Lambda 실행 역할). Athena 조회를 붙이면 us-east-2의 athena/glue/s3 읽기 권한이 추가로 필요.
 """
@@ -12,7 +12,7 @@ import os
 
 from detector import detect, generate_guide
 
-MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "")
+MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
 BEDROCK_REGION = os.environ.get("BEDROCK_REGION", "ap-northeast-2")
 
 

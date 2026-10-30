@@ -256,6 +256,10 @@ v5에서 3가지 추가 (`detector.py`의 `SYSTEM_PROMPT`, `bedrock_test_cases.m
 
 남은 문제: C에서 오늘 수치 누락 -> 프롬프트는 바꾸지 않고 `validate_guide`에 "오늘 수치가 답변에 있는지" 검사를 추가 (위반 시 재시도). v6 답변 4건에 돌려 C만 잡히고 A, B, D는 통과 확인.
 
+## API 호출 확인 (2026-10-30)
+
+SageMaker 노트북 역할에 인라인 정책(`bedrock:InvokeModel`, Haiku 4.5) 추가 후 boto3 `converse` 호출 성공. 서울 리전에서 `anthropic.claude-haiku-4-5-...`는 on-demand 미지원(추론 프로파일 필요), `apac.` 접두사는 ID 없음, **`global.anthropic.claude-haiku-4-5-20251001-v1:0`가 동작**. 프롬프트 v6의 system/user 분리 호출과 코드 검사는 노트북에서 최종 확인 예정.
+
 ## 다음 할 일
 
 - 이상 유형별 테스트 케이스 5~10개 실행 (`detector.py`의 `build_prompt` 출력 사용): 활동량 급감 단독, 수면 부족 단독, 집단 기준 단독, 복합, 심각도 high

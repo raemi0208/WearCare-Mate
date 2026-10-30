@@ -182,6 +182,7 @@
 - **출력 검사**: AI/ML 함수가 줄 수, 문장 수, 금지어, 이모지, 상담 문구, 오늘 수치 포함 여부를 검사하고 위반이면 1회 재시도한다. 그래도 위반이면 `guide.warnings`에 사유를 담아 반환한다 (프론트는 warnings가 있어도 표시는 가능, 로그로만 수집). 입력의 "평소"(개인)와 "평균"(집단) 표현을 섞지 않는다.
 - 마지막 줄은 증상이 지속되거나 불편하면 전문가와 상담하라는 문장으로 한다.
 - `basis`가 `population`인 이상은 "평균 대비" 표현을 쓰고, `personal`은 "평소 대비" 표현을 쓴다.
+- 모델: Claude Haiku 4.5, 호출 ID `global.anthropic.claude-haiku-4-5-20251001-v1:0` (서울 리전에서 SageMaker 노트북 역할로 boto3 converse 호출 확인, 2026-10-30). 서울에서는 직접 모델 ID나 `apac.` 접두사 ID는 안 되고 `global.` 추론 프로파일을 쓴다. 호출 역할에 `bedrock:InvokeModel`(Haiku 4.5 foundation-model과 inference-profile) 필요.
 - 리전: Bedrock Playground와 SageMaker 노트북은 서울(ap-northeast-2), S3/Glue/Athena 데이터는 us-east-2(오하이오)에서 확인함. 서울 이전은 하지 않으며, 코드에서 서비스별 리전을 따로 지정한다 (Athena 조회는 us-east-2, Bedrock 호출은 서울). 모델은 품질, 비용, 지연을 비교한 뒤 확정한다 (Playground 테스트에서 응답 약 2~3초).
 
 ## 9. 연동 책임 (제안)
