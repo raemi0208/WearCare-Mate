@@ -23,20 +23,20 @@ export default function TrendsPage({ data }) {
         const series = timeseries[s.key] || [];
         const values = series.map((d) => d.value);
         const average = avg(series);
-        const max = Math.max(...values);
-        const min = Math.min(...values);
+        const max = values.length ? Math.max(...values) : "—";
+        const min = values.length ? Math.min(...values) : "—";
         const anomalyCount = series.filter((d) => d.anomaly).length;
 
         return (
           <Card
             key={s.key}
             title={`${s.icon} ${s.title}`}
-            subtitle={`최근 7일 추이 (단위: ${s.unit})`}
+            subtitle={`조회된 기준 주의 기록 (단위: ${s.unit})`}
             action={
               anomalyCount > 0 ? (
                 <Badge variant="danger">이상 {anomalyCount}건</Badge>
               ) : (
-                <Badge variant="normal">정상</Badge>
+                <Badge variant="ghost">{series.length ? "강조된 이상 없음" : "데이터 없음"}</Badge>
               )
             }
           >
@@ -44,7 +44,7 @@ export default function TrendsPage({ data }) {
               <div className="trend-stat">
                 <span className="trend-stat__label">평균</span>
                 <span className="trend-stat__value">
-                  {average.toFixed(s.key === "steps" ? 0 : 1)}
+                  {series.length ? average.toFixed(s.key === "steps" ? 0 : 1) : "—"}
                   <span className="trend-stat__unit">{s.unit}</span>
                 </span>
               </div>

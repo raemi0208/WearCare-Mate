@@ -19,7 +19,7 @@ import {
 } from "../data/mockData";
 import { loadProfile, saveProfile } from "./profileStorage";
 
-const API_BASE = process.env.REACT_APP_API_BASE || "";
+const API_BASE = (process.env.REACT_APP_API_BASE || "").trim().replace(/\/+$/, "");
 
 // 기본 사용자 정보에 브라우저에 저장된 프로필을 덮어씀
 function resolveUser(baseUser) {

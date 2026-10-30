@@ -17,7 +17,7 @@ import { fetchDashboard, fetchAiGuide } from "./services/api";
 const PAGE_META = {
   dashboard: {
     title: "건강 대시보드",
-    subtitle: "최근 7일 웨어러블 데이터 분석 · 실시간 모니터링",
+    subtitle: "웨어러블 기록 데이터 분석",
   },
   trends: {
     title: "추이 분석",
@@ -25,7 +25,7 @@ const PAGE_META = {
   },
   anomaly: {
     title: "이상 탐지",
-    subtitle: "Amazon SageMaker 기반 이상 패턴 분석",
+    subtitle: "기록 데이터 기반 이상 패턴 분석",
   },
   guide: {
     title: "AI 건강 가이드",
@@ -47,6 +47,7 @@ function App() {
   const [error, setError] = useState(null);
   const [activeNav, setActiveNav] = useState("dashboard");
   const [regenerating, setRegenerating] = useState(false);
+  const [guideError, setGuideError] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -69,11 +70,13 @@ function App() {
   }, []);
 
   const handleRegenerate = useCallback(() => {
+    setGuideError(null);
     setRegenerating(true);
     fetchAiGuide()
       .then((guide) => {
         setData((prev) => (prev ? { ...prev, aiGuide: guide } : prev));
       })
+      .catch(() => setGuideError("분석 및 가이드를 다시 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."))
       .finally(() => setRegenerating(false));
   }, []);
 
@@ -133,6 +136,7 @@ function App() {
         />
 
         <div className="content">
+          {guideError && <p role="alert">{guideError}</p>}
           {loading && <LoadingState />}
           {error && <ErrorState message={error} />}
           {data && !loading && !error && renderPage()}

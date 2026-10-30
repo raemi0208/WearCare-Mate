@@ -19,6 +19,7 @@ export default function GuidePage({ data, onRegenerate, regenerating }) {
         subtitle="Amazon Bedrock이 생성한 과거 가이드"
       >
         <div className="history-list">
+          {history.length === 0 && <p>저장된 가이드 내역이 없습니다.</p>}
           {history.map((h) => (
             <div key={h.id} className="history-item">
               <div className="history-item__top">
