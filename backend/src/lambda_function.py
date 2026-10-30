@@ -8,7 +8,9 @@
 """
 
 import json
+import logging
 
+from src.data_source import DataSourceUnavailableError, select_health_data_builder
 from src.mock_data import (
     build_anomalies_mock,
     build_guides_mock,
@@ -17,6 +19,25 @@ from src.mock_data import (
 
 # 서비스 이름을 한 곳에서 관리하기 위한 상수입니다.
 SERVICE_NAME = "WearCare Mate Backend"
+
+# 예상하지 못한 예외가 발생했을 때 클라이언트에 돌려줄 고정 응답 본문입니다.
+# ⚠️ 예외 메시지, 스택 트레이스, 사용자 ID 등은 절대 포함하지 않습니다.
+#    (내부 구현이나 민감한 데이터가 응답으로 새어 나가지 않게 하기 위함)
+INTERNAL_ERROR_BODY = {
+    "error": "internal_error",
+    "message": "서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+}
+
+# 데이터 소스를 사용할 수 없을 때(DataSourceUnavailableError) 돌려줄 고정 응답 본문입니다.
+# api-spec.md 1.4절의 503 `unavailable` 을 따릅니다.
+# ⚠️ 어떤 데이터 소스인지, 왜 사용할 수 없는지 같은 내부 정보는 포함하지 않습니다.
+UNAVAILABLE_BODY = {
+    "error": "unavailable",
+    "message": "일시적으로 데이터를 조회할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+}
+
+# 모듈 로거. Lambda 에서는 CloudWatch Logs 로 전달됩니다.
+logger = logging.getLogger(__name__)
 
 
 def _build_response(status_code, body):
@@ -172,8 +193,11 @@ def _handle_user_resource(event, user_id, mock_builder):
     return _build_response(200, mock_builder(user_id, query))
 
 
-def lambda_handler(event, context):
-    """AWS Lambda 가 호출하는 진입 함수.
+def _route_request(event):
+    """요청을 경로/메서드에 맞는 처리로 연결한다. (기존 lambda_handler 본문)
+
+    400/404 같은 "예상된 오류"는 예외를 던지지 않고 응답 객체를 return 한다.
+    그래서 lambda_handler 의 예외 처리(500)에 걸리지 않고 그대로 전달된다.
 
     처리 흐름:
     1) 이벤트에서 메서드/경로를 꺼낸다. 실패하면 400.
@@ -185,7 +209,6 @@ def lambda_handler(event, context):
 
     Args:
         event (dict): API Gateway 가 전달한 요청 정보.
-        context: Lambda 실행 환경 정보(이번 구현에서는 사용하지 않음).
 
     Returns:
         dict: API Gateway 형식의 응답 객체.
@@ -200,11 +223,13 @@ def lambda_handler(event, context):
     if method == "GET" and path == "/health":
         return _build_response(200, {"status": "ok", "service": SERVICE_NAME})
 
-    # 3) GET /users/{userId}/health-data (개발/테스트 전용 MOCK)
-    #    ⚠️ 이 분기는 가상 데이터를 돌려줄 뿐, 실제 사용자 데이터를 조회하지 않는다.
+    # 3) GET /users/{userId}/health-data
+    #    DATA_SOURCE 설정으로 빌더를 고른다. 기본값(mock)이면 기존 MOCK 빌더를 쓴다.
+    #    ⚠️ 실제 데이터 소스(real)는 아직 미구현이며, 선택하면 503 이 된다.
     user_id = _match_user_resource_route(method, path, "health-data")
     if user_id is not None:
-        return _handle_user_resource(event, user_id, build_health_data_mock)
+        builder = select_health_data_builder(build_health_data_mock)
+        return _handle_user_resource(event, user_id, builder)
 
     # 4) GET /users/{userId}/anomalies (개발/테스트 전용 MOCK)
     #    ⚠️ 실제 AI/ML(SageMaker) 결과가 아니라 가상 데이터를 돌려준다.
@@ -226,3 +251,45 @@ def lambda_handler(event, context):
             "message": f"지원하지 않는 요청입니다: {method} {path}",
         },
     )
+
+
+def lambda_handler(event, context):
+    """AWS Lambda 가 호출하는 진입 함수.
+
+    실제 라우팅은 _route_request() 가 담당하고, 이 함수는 그 바깥을 감싸
+    "예상하지 못한 예외"만 HTTP 500 응답으로 바꾼다.
+
+    오류 처리 범위:
+        - 400/404 등 예상된 오류는 _route_request() 가 응답으로 return 하므로
+          여기서 바뀌지 않는다.
+        - DataSourceUnavailableError 만 503 으로 바꾼다.
+          (예: DATA_SOURCE=real 이지만 실제 데이터 조회가 아직 미구현)
+        - 그 외 Exception 계열의 처리되지 않은 예외는 500 으로 바꾼다.
+          DATA_SOURCE 설정 오류(DataSourceConfigError)도 여기에 해당한다.
+          (예: MOCK/데이터 처리 중 버그, JSON 직렬화 실패)
+        - KeyboardInterrupt, SystemExit 같은 BaseException 은 잡지 않는다.
+          런타임 종료 신호까지 삼키지 않기 위함이다.
+
+    보안:
+        - 응답 본문은 고정 문구(INTERNAL_ERROR_BODY)만 사용한다.
+          예외 메시지, 스택 트레이스, 사용자 ID 는 응답에 넣지 않는다.
+        - 로그에는 예외 타입 이름만 남긴다. 예외 메시지에는 사용자 ID 나
+          건강 수치가 섞여 있을 수 있으므로 기록하지 않는다.
+
+    Args:
+        event (dict): API Gateway 가 전달한 요청 정보.
+        context: Lambda 실행 환경 정보(이번 구현에서는 사용하지 않음).
+
+    Returns:
+        dict: API Gateway 형식의 응답 객체.
+    """
+    try:
+        return _route_request(event)
+    except DataSourceUnavailableError as error:
+        # 데이터 소스를 사용할 수 없는 경우만 503 으로 바꾼다. (내부 정보 비노출)
+        logger.error("Data source unavailable: %s", type(error).__name__)
+        return _build_response(503, dict(UNAVAILABLE_BODY))
+    except Exception as error:  # noqa: BLE001 - 최종 안전망으로 의도적으로 넓게 잡음
+        logger.error("Unhandled exception in lambda_handler: %s", type(error).__name__)
+        # 매 요청마다 새 dict 를 넘겨 상수가 변경되지 않도록 한다.
+        return _build_response(500, dict(INTERNAL_ERROR_BODY))

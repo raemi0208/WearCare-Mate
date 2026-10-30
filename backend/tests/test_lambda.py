@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 # 이 테스트 파일에서 src 패키지를 import 할 수 있도록
 # backend 폴더(= 이 파일의 상위 폴더)를 모듈 검색 경로에 추가합니다.
@@ -17,8 +18,29 @@ BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
+from src.data_source import DATA_SOURCE_ENV  # noqa: E402
 from src.lambda_function import lambda_handler  # noqa: E402
 from src.mock_data import build_anomalies_mock  # noqa: E402
+
+
+# ---------------------------------------------------------------------------
+# 환경변수 격리
+# ---------------------------------------------------------------------------
+# 이 모듈의 테스트는 기존 MOCK 응답을 검증하므로, 개발 PC 에 DATA_SOURCE 가
+# 어떤 값으로 설정되어 있든 항상 DATA_SOURCE=mock 으로 실행되어야 한다.
+# - setUpModule: 이 모듈의 첫 테스트 전에 한 번 실행. os.environ 을 patch.dict 로
+#   감싸고 DATA_SOURCE=mock 을 적용한다.
+# - tearDownModule: 이 모듈의 마지막 테스트 후 한 번 실행. 원래 환경변수로 복원한다.
+# 환경변수별 동작 검증은 tests/test_data_source.py 에서 별도로 수행한다.
+_env_patcher = mock.patch.dict(os.environ, {DATA_SOURCE_ENV: "mock"})
+
+
+def setUpModule():
+    _env_patcher.start()
+
+
+def tearDownModule():
+    _env_patcher.stop()
 
 
 def make_event(method, path, query="__default__"):
@@ -315,6 +337,161 @@ class GuidesMockApiTest(unittest.TestCase):
         """같은 경로라도 지원하지 않는 메서드(POST)는 404 를 반환해야 한다."""
         response = lambda_handler(make_event("POST", "/users/u-1001/guides"), None)
         self.assertEqual(response["statusCode"], 404)
+
+
+# 강제로 발생시키는 예외에 넣을 "민감한 정보" 예시 (응답/로그에 노출되면 안 됨)
+SENSITIVE_DETAIL = "secret-db-password-1234"
+SENSITIVE_USER_ID = "u-sensitive-9999"
+
+# 예외를 강제로 일으킬 때 바꿔치기할 대상(모듈 안의 이름)
+PATCH_HEALTH = "src.lambda_function.build_health_data_mock"
+PATCH_ANOMALIES = "src.lambda_function.build_anomalies_mock"
+PATCH_GUIDES = "src.lambda_function.build_guides_mock"
+PATCH_ROUTE = "src.lambda_function._extract_route"
+LOGGER_NAME = "src.lambda_function"
+
+
+def raise_runtime_error(*args, **kwargs):
+    """민감한 정보가 담긴 예외를 일부러 발생시킨다."""
+    raise RuntimeError(f"{SENSITIVE_DETAIL} for {SENSITIVE_USER_ID}")
+
+
+class UnexpectedErrorHandlingTest(unittest.TestCase):
+    """처리되지 않은 예외 → HTTP 500 변환과 정보 비노출을 검증한다."""
+
+    def assert_internal_error(self, response):
+        """500 응답이 명세의 {error, message} 형식이고 민감 정보가 없는지 확인한다."""
+        self.assertEqual(response["statusCode"], 500)
+        self.assertEqual(response["headers"]["Content-Type"], "application/json")
+        body = json.loads(response["body"])
+        self.assertEqual(set(body.keys()), {"error", "message"})
+        self.assertEqual(body["error"], "internal_error")
+        # 예외 메시지, 사용자 ID, 스택 트레이스가 응답에 없어야 한다.
+        for leaked in (SENSITIVE_DETAIL, SENSITIVE_USER_ID, "Traceback", "RuntimeError"):
+            self.assertNotIn(leaked, response["body"])
+
+    def test_health_data_exception_returns_500(self):
+        """health-data 처리 중 예외가 나면 500 을 반환해야 한다."""
+        event = make_event("GET", f"/users/{SENSITIVE_USER_ID}/health-data")
+        with mock.patch(PATCH_HEALTH, side_effect=raise_runtime_error):
+            with self.assertLogs(LOGGER_NAME, level="ERROR"):
+                response = lambda_handler(event, None)
+        self.assert_internal_error(response)
+
+    def test_anomalies_exception_returns_500(self):
+        """anomalies 처리 중 예외(KeyError)가 나면 500 을 반환해야 한다."""
+        event = make_event("GET", f"/users/{SENSITIVE_USER_ID}/anomalies")
+        with mock.patch(PATCH_ANOMALIES, side_effect=KeyError(SENSITIVE_DETAIL)):
+            with self.assertLogs(LOGGER_NAME, level="ERROR"):
+                response = lambda_handler(event, None)
+        self.assert_internal_error(response)
+
+    def test_guides_non_serializable_body_returns_500(self):
+        """응답을 JSON 으로 만들 수 없는 경우(직렬화 실패)도 500 이어야 한다."""
+        event = make_event("GET", f"/users/{SENSITIVE_USER_ID}/guides")
+        with mock.patch(PATCH_GUIDES, return_value={"items": object()}):
+            with self.assertLogs(LOGGER_NAME, level="ERROR"):
+                response = lambda_handler(event, None)
+        self.assert_internal_error(response)
+
+    def test_value_error_from_builder_returns_500(self):
+        """검증 단계가 아닌 곳의 ValueError 는 400 이 아니라 500 이어야 한다."""
+        event = make_event("GET", f"/users/{SENSITIVE_USER_ID}/health-data")
+        with mock.patch(PATCH_HEALTH, side_effect=ValueError(SENSITIVE_DETAIL)):
+            with self.assertLogs(LOGGER_NAME, level="ERROR"):
+                response = lambda_handler(event, None)
+        self.assert_internal_error(response)
+
+    def test_exception_in_route_extraction_returns_500(self):
+        """라우팅 정보 추출 단계에서 ValueError 가 아닌 예외가 나면 500 이어야 한다."""
+        with mock.patch(PATCH_ROUTE, side_effect=TypeError(SENSITIVE_DETAIL)):
+            with self.assertLogs(LOGGER_NAME, level="ERROR"):
+                response = lambda_handler(make_event("GET", "/health"), None)
+        self.assert_internal_error(response)
+
+    def test_log_contains_only_exception_type(self):
+        """로그에는 예외 타입만 남고, 예외 메시지나 사용자 ID 는 남지 않아야 한다."""
+        event = make_event("GET", f"/users/{SENSITIVE_USER_ID}/health-data")
+        with mock.patch(PATCH_HEALTH, side_effect=raise_runtime_error):
+            with self.assertLogs(LOGGER_NAME, level="ERROR") as captured:
+                lambda_handler(event, None)
+        log_text = "\n".join(captured.output)
+        self.assertIn("RuntimeError", log_text)
+        self.assertNotIn(SENSITIVE_DETAIL, log_text)
+        self.assertNotIn(SENSITIVE_USER_ID, log_text)
+
+    def test_base_exception_is_not_swallowed(self):
+        """KeyboardInterrupt 같은 BaseException 은 500 으로 바꾸지 않고 그대로 전달해야 한다."""
+        event = make_event("GET", "/users/u-1001/health-data")
+        with mock.patch(PATCH_HEALTH, side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                lambda_handler(event, None)
+
+    def test_error_body_constant_is_not_mutated(self):
+        """500 응답을 여러 번 만들어도 매번 같은 고정 문구여야 한다."""
+        event = make_event("GET", "/users/u-1001/health-data")
+        with mock.patch(PATCH_HEALTH, side_effect=raise_runtime_error):
+            with self.assertLogs(LOGGER_NAME, level="ERROR"):
+                first = lambda_handler(event, None)
+                second = lambda_handler(event, None)
+        self.assertEqual(first["body"], second["body"])
+
+
+class ErrorHandlingScopeTest(unittest.TestCase):
+    """예외 처리 범위가 넓어져 기존 400/404 를 500 으로 바꾸지 않는지 검증한다.
+
+    모든 MOCK 빌더가 예외를 던지도록 바꿔 둔 상태에서도,
+    빌더를 호출하기 전에 결정되는 200/400/404 응답은 그대로여야 한다.
+    """
+
+    def setUp(self):
+        patchers = [
+            mock.patch(PATCH_HEALTH, side_effect=raise_runtime_error),
+            mock.patch(PATCH_ANOMALIES, side_effect=raise_runtime_error),
+            mock.patch(PATCH_GUIDES, side_effect=raise_runtime_error),
+        ]
+        for patcher in patchers:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_health_still_200(self):
+        """GET /health 는 빌더와 무관하므로 계속 200 이어야 한다."""
+        response = lambda_handler(make_event("GET", "/health"), None)
+        self.assertEqual(response["statusCode"], 200)
+
+    def test_unknown_path_still_404(self):
+        """등록되지 않은 경로는 계속 404 여야 한다."""
+        response = lambda_handler(make_event("GET", "/unknown"), None)
+        self.assertEqual(response["statusCode"], 404)
+        self.assertEqual(json.loads(response["body"])["error"], "not_found")
+
+    def test_wrong_method_still_404(self):
+        """지원하지 않는 메서드는 계속 404 여야 한다."""
+        for path in ("/health", "/users/u-1001/health-data", "/users/u-1001/guides"):
+            response = lambda_handler(make_event("POST", path), None)
+            self.assertEqual(response["statusCode"], 404, path)
+
+    def test_malformed_event_still_400(self):
+        """잘못된 이벤트 형식은 계속 400 이어야 한다."""
+        for event in ({"foo": "bar"}, "not-a-dict", None):
+            response = lambda_handler(event, None)
+            self.assertEqual(response["statusCode"], 400)
+            self.assertEqual(json.loads(response["body"])["error"], "bad_request")
+
+    def test_empty_user_id_still_400(self):
+        """빈 userId 는 빌더 호출 전에 걸러지므로 계속 400 이어야 한다."""
+        for resource in ("health-data", "anomalies", "guides"):
+            response = lambda_handler(make_event("GET", f"/users//{resource}"), None)
+            self.assertEqual(response["statusCode"], 400, resource)
+
+    def test_invalid_query_still_400(self):
+        """잘못된 쿼리 형식은 빌더 호출 전에 걸러지므로 계속 400 이어야 한다."""
+        for resource in ("health-data", "anomalies", "guides"):
+            response = lambda_handler(
+                make_event("GET", f"/users/u-1001/{resource}", ["not", "a", "dict"]),
+                None,
+            )
+            self.assertEqual(response["statusCode"], 400, resource)
 
 
 if __name__ == "__main__":
