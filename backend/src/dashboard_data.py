@@ -14,12 +14,12 @@ REAL 대시보드 (개발·통합 테스트 전용):
         summaryStats 의 sleep/hr/score 카드 → 넣지 않음
         timeseries.sleep / heartRate → []
         sleepStages → {"totalLabel": "데이터 없음", "segments": []}
-    - MOCK 유지 항목 (AI/ML·SNS 연동 전, "[예시]" 표시 유지): anomalies, aiGuide, notifications
+    - 이 빌더 단독 사용 시 AI 항목은 MOCK. AI REAL은 ai_service.py에서 덮어쓴다.
     - user: 실제 이름·나이 데이터가 없으므로 개발용 데모 표시 문구를 쓴다. 사용자 ID 는 넣지 않는다.
     - 조회 실패 시 MOCK 으로 대체하지 않는다. (503)
 
 ⚠️ 실제 AWS 조회 검증 여부:
-    로컬 단위 테스트(가짜 Athena 클라이언트)로만 검증했다. 실제 Athena 조회는 아직 실행하지 않았다.
+    별도 테스트 Lambda에서 실제 조회 및 정상 AI 응답 조립을 확인했다.
 """
 
 from src.dashboard_mock_data import build_dashboard_mock
@@ -73,7 +73,7 @@ def fetch_dashboard_activity_items(client_factory=None, environ=None):
     return build_activity_items(mapped_rows, user_id)
 
 
-def build_real_dashboard(client_factory=None, environ=None):
+def build_real_dashboard(client_factory=None, environ=None, *, activity_items=None):
     """REAL 대시보드 응답 본문을 만든다. (API.md 스키마, 걸음 수만 실제 데이터)
 
     Args:
@@ -85,7 +85,8 @@ def build_real_dashboard(client_factory=None, environ=None):
         DataSourceUnavailableError: 스위치 꺼짐, AWS 조회 실패, 최대 행 수 도달 (503)
         DataSourceConfigError: DASHBOARD_USER_ID/Athena 설정 오류, boto3 미설치 (500)
     """
-    items = fetch_dashboard_activity_items(client_factory=client_factory, environ=environ)
+    items = (fetch_dashboard_activity_items(client_factory=client_factory, environ=environ)
+             if activity_items is None else activity_items)
     stats = compute_weekly_steps(items)
     steps_card = build_steps_summary_card(stats)
 

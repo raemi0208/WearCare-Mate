@@ -174,11 +174,44 @@ def build_steps_summary_card(stats):
     }
 
 
-def build_steps_timeseries(stats):
-    """기준 주 월~일 중 데이터가 있는 날의 걸음 수 시계열을 만든다. stats 가 None 이면 빈 목록."""
+def _normalize_anomaly_dates(anomaly_dates):
+    """이상 날짜 목록을 date 집합으로 만든다. None 이면 빈 집합.
+
+    date 객체 또는 엄격한 YYYY-MM-DD 문자열만 허용한다. 그 외 값은 ValueError.
+    (잘못된 값을 조용히 무시하면 이상 표시가 누락된 것을 알아챌 수 없기 때문)
+    """
+    if anomaly_dates is None:
+        return set()
+    if isinstance(anomaly_dates, (str, bytes)) or not hasattr(anomaly_dates, "__iter__"):
+        raise ValueError("anomaly_dates 는 날짜 목록이어야 합니다.")
+    normalized = set()
+    for value in anomaly_dates:
+        if isinstance(value, datetime):
+            raise ValueError("anomaly_dates 에는 시간 없는 날짜만 넣어야 합니다.")
+        if hasattr(value, "isoformat") and hasattr(value, "weekday"):
+            normalized.add(value)
+            continue
+        parsed = _parse_date(value)
+        if parsed is None:
+            raise ValueError("anomaly_dates 에 올바르지 않은 날짜가 있습니다.")
+        normalized.add(parsed)
+    return normalized
+
+
+def build_steps_timeseries(stats, anomaly_dates=None):
+    """기준 주 월~일 중 데이터가 있는 날의 걸음 수 시계열을 만든다. stats 가 None 이면 빈 목록.
+
+    Args:
+        stats (dict | None): compute_weekly_steps() 결과.
+        anomaly_dates (Iterable[date | str] | None): 걸음 수 이상으로 판정된 날짜.
+            None(기본값)이면 모든 지점의 anomaly 가 False 이다. (기존 동작과 동일)
+            ⚠️ 실제 AI/ML 결과는 아직 연결하지 않았다. 기준 주 밖의 날짜는 무시된다.
+            판정하지 않은 날짜의 False 는 "정상"이 아니라 "이상으로 표시하지 않음"을 뜻한다.
+    """
     if stats is None:
         return []
+    flagged = _normalize_anomaly_dates(anomaly_dates)
     return [
-        {"label": WEEKDAY_LABELS[day.weekday()], "value": steps, "anomaly": False}
+        {"label": WEEKDAY_LABELS[day.weekday()], "value": steps, "anomaly": day in flagged}
         for day, steps in sorted(stats["days"].items())
     ]

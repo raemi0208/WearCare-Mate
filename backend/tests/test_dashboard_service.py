@@ -214,5 +214,39 @@ class StepsTimeseriesTest(unittest.TestCase):
         self.assertEqual(build_steps_timeseries(None), [])
 
 
+class StepsTimeseriesAnomalyDatesTest(unittest.TestCase):
+    """이상 날짜 선택 인자 (AI/ML 결과는 아직 연결하지 않음)."""
+
+    def setUp(self):
+        self.stats = compute_weekly_steps(THIS_WEEK)   # 04-04(월), 04-05(화), 04-07(목), 04-09(토)
+
+    def flags(self, anomaly_dates=None):
+        return [p["anomaly"] for p in build_steps_timeseries(self.stats, anomaly_dates)]
+
+    def test_default_is_unchanged(self):
+        self.assertEqual(build_steps_timeseries(self.stats),
+                         build_steps_timeseries(self.stats, anomaly_dates=None))
+        self.assertEqual(self.flags(), [False, False, False, False])
+        self.assertEqual(self.flags([]), [False, False, False, False])
+
+    def test_marks_given_dates(self):
+        self.assertEqual(self.flags({date(2016, 4, 7)}), [False, False, True, False])
+        self.assertEqual(self.flags(["2016-04-04", "2016-04-09"]), [True, False, False, True])
+
+    def test_dates_outside_week_or_without_data_are_ignored(self):
+        """기준 주 밖이거나 데이터가 없는 날(04-06)은 지점을 만들지 않는다."""
+        series = build_steps_timeseries(self.stats, ["2016-03-28", "2016-04-06"])
+        self.assertEqual(len(series), 4)
+        self.assertTrue(all(point["anomaly"] is False for point in series))
+
+    def test_invalid_dates_raise(self):
+        for value in ("2016-04-07", ["2016-4-7"], ["bad"], [20160407], 5):
+            with self.assertRaises(ValueError, msg=repr(value)):
+                build_steps_timeseries(self.stats, value)
+        from datetime import datetime
+        with self.assertRaises(ValueError):
+            build_steps_timeseries(self.stats, [datetime(2016, 4, 7, 9, 0)])
+
+
 if __name__ == "__main__":
     unittest.main()

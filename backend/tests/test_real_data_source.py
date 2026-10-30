@@ -62,8 +62,9 @@ LOGGER_NAME = "src.lambda_function"
 PATCH_CLIENT_FACTORY = "src.athena_repository.create_athena_client"
 HEALTH_PATH = f"/users/{USER_ID}/health-data"
 
-_MANAGED_ENV_PREFIXES = ("ATHENA_",)
-_MANAGED_ENV_NAMES = ("DATA_SOURCE", ENABLE_REAL_DATA_TESTING_ENV, DASHBOARD_USER_ID_ENV)
+_MANAGED_ENV_PREFIXES = ("ATHENA_", "ML_")
+_MANAGED_ENV_NAMES = ("DATA_SOURCE", ENABLE_REAL_DATA_TESTING_ENV, DASHBOARD_USER_ID_ENV,
+                      "AI_SOURCE")
 
 
 class UnexpectedAwsClientCreation(BaseException):
@@ -213,7 +214,7 @@ class RealModeSuccessTest(RealModeTestCase):
         self.assertEqual(start["QueryExecutionContext"], {"Database": "test_db"})
         self.assertEqual(start["WorkGroup"], "primary")
         self.assertEqual(start["ExecutionParameters"],
-                         ["'1000000001'", "'2099-01-01'", "'2099-01-31'"])
+                         ["1000000001", "'2099-01-01'", "'2099-01-31'"])
         self.assertNotIn(USER_ID, start["QueryString"])
 
     def test_zero_rows_returns_200_with_empty_items(self):
@@ -250,7 +251,7 @@ class RealModeSuccessTest(RealModeTestCase):
         client = self.use_fake_client(FakeAthenaClient())
         response = self.call(query={"metric": "sleep", "interval": "day"})
         self.assertEqual(response["statusCode"], 200)
-        self.assertEqual(client.calls_of("start")[0]["ExecutionParameters"], ["'1000000001'"])
+        self.assertEqual(client.calls_of("start")[0]["ExecutionParameters"], ["1000000001"])
 
 
 # ---------------------------------------------------------------------------

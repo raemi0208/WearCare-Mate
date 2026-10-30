@@ -134,7 +134,7 @@ class RealDashboardSuccessTest(RealDashboardTestCase):
         self.get_dashboard(query={"userId": OTHER_USER_ID, "from": "2016-01-01"})
         self.client_factory.assert_called_once_with("us-east-2")
         start = client.calls_of("start")[0]
-        self.assertEqual(start["ExecutionParameters"], ["'1000000001'"])
+        self.assertEqual(start["ExecutionParameters"], ["1000000001"])
         self.assertNotIn(USER_ID, start["QueryString"])
 
     def test_rows_of_other_users_are_excluded(self):

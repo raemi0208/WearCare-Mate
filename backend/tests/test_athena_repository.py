@@ -282,6 +282,12 @@ class QueryValidationTest(unittest.TestCase):
 
 class BuildQueryTest(unittest.TestCase):
 
+    def test_numeric_id_normalizes_leading_zeros_without_float_rounding(self):
+        for user_id, expected in (("0000000123", "123"), ("9007199254740993", "9007199254740993"), ("0", "0")):
+            with self.subTest(user_id=user_id):
+                _, params = build_activity_query(make_config(), user_id)
+                self.assertEqual(params, [expected])
+
     def test_user_input_is_not_in_sql(self):
         """사용자 입력은 SQL 문자열이 아니라 ExecutionParameters 로만 전달된다."""
         sql, params = build_activity_query(make_config(), USER_ID, "2099-01-01", "2099-01-31")
@@ -292,7 +298,7 @@ class BuildQueryTest(unittest.TestCase):
     def test_string_parameters_follow_athena_quoting_rule(self):
         """공식 문서 규칙: 문자열 값은 작은따옴표로 감싸고, ? 는 따옴표 안에 두지 않는다."""
         sql, params = build_activity_query(make_config(), USER_ID, "2099-01-01", "2099-01-31")
-        self.assertEqual(params, ["'1000000001'", "'2099-01-01'", "'2099-01-31'"])
+        self.assertEqual(params, ["1000000001", "'2099-01-01'", "'2099-01-31'"])
         self.assertNotIn("'?'", sql)
         self.assertNotIn('"?"', sql)
 
@@ -334,7 +340,7 @@ class QueryExecutionTest(unittest.TestCase):
         request = client.calls_of("start")[0]
         self.assertEqual(request["QueryExecutionContext"], {"Database": "test_db"})
         self.assertEqual(request["WorkGroup"], "primary")
-        self.assertEqual(request["ExecutionParameters"], ["'1000000001'", "'2099-01-01'"])
+        self.assertEqual(request["ExecutionParameters"], ["1000000001", "'2099-01-01'"])
         self.assertNotIn(USER_ID, request["QueryString"])
         self.assertNotIn("ResultConfiguration", request)
 

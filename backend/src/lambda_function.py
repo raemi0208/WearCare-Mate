@@ -3,8 +3,8 @@
 이 모듈은 Amazon API Gateway(HTTP API, payload format 2.0)에서 들어온
 요청을 처리하는 Lambda 핸들러를 정의합니다.
 
-지금 단계에서는 외부 서비스(Timestream, SNS, Bedrock 등)에 연결하지 않고,
-표준 라이브러리만으로 기본 라우팅과 응답 형식만 구현합니다.
+기본 모드는 예시 응답이며, REAL 경로는 Athena와 AI/ML Lambda를 호출합니다.
+SNS와 직접 Bedrock 호출은 이 모듈에 없습니다.
 """
 
 import json
@@ -15,6 +15,8 @@ from src.data_source import (
     DataSourceNotFoundError,
     DataSourceRequestError,
     DataSourceUnavailableError,
+    ensure_ai_source_is_mock,
+    get_ai_source_name,
     select_dashboard_builder,
     select_health_data_builder,
 )
@@ -242,15 +244,25 @@ def _route_request(event):
         return _build_response(200, {"status": "ok", "service": SERVICE_NAME})
 
     # 2-1) GET /dashboard (프론트엔드 API.md 스키마)
-    #      DATA_SOURCE=mock(기본값)이면 예시 데이터. real 은 아직 미구현이라 503 (MOCK 대체 없음).
+    #      DATA_SOURCE=mock(기본값)이면 예시 데이터. real은 개발 테스트 조건에서 Athena 조회.
     #      쿼리 파라미터는 사용하지 않는다(userId 등을 보내도 조회 대상에 영향 없음).
+    #      AI_SOURCE=real uses the guarded real AI service; failures never fall back to MOCK.
     if method == "GET" and path == "/dashboard":
+        if get_ai_source_name() == "real":
+            from src.ai_service import build_ai_dashboard
+            return _build_response(200, build_ai_dashboard())
+        ensure_ai_source_is_mock()
         builder = select_dashboard_builder(build_dashboard_mock)
         return _build_response(200, builder())
 
     # 2-2) GET /ai-guide (프론트엔드 API.md 의 aiGuide 객체)
-    #      AI/ML(Bedrock) 연동 전이므로 항상 예시 데이터. Bedrock 을 호출하지 않는다.
+    #      기본은 예시 데이터. AI_SOURCE=real은 AI/ML Lambda 경로를 사용한다.
+    #      AI_SOURCE=real uses the guarded real AI service.
     if method == "GET" and path == "/ai-guide":
+        if get_ai_source_name() == "real":
+            from src.ai_service import build_ai_guide
+            return _build_response(200, build_ai_guide())
+        ensure_ai_source_is_mock()
         return _build_response(200, build_ai_guide_mock())
 
     # 3) GET /users/{userId}/health-data

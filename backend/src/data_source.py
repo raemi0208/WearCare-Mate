@@ -148,3 +148,51 @@ def select_dashboard_builder(mock_builder):
     from src.dashboard_data import build_real_dashboard
 
     return build_real_dashboard
+
+
+# ---------------------------------------------------------------------------
+# AI 데이터 소스 (AI_SOURCE) — DATA_SOURCE 와 독립
+# ---------------------------------------------------------------------------
+# /dashboard 의 anomalies·aiGuide·timeseries[].anomaly 와 /ai-guide 의 출처를 정한다.
+#   (설정 안 함) / "mock" → 기존 예시 데이터 (기본값)
+#   "real"              → lambda_function에서 ai_service.py의 실제 AI 경로 선택
+#                          (실패를 MOCK으로 대체하지 않는다)
+#   그 외 값 / 빈 문자열  → DataSourceConfigError (500)
+# 실제 연결 시에도 기존 REAL 진입 조건(ENABLE_REAL_DATA_TESTING, DASHBOARD_USER_ID)을 함께 요구한다.
+# /users/{userId}/anomalies, /users/{userId}/guides (기존 MOCK API) 에는 영향이 없다.
+AI_SOURCE_ENV = "AI_SOURCE"
+AI_SOURCE_MOCK = "mock"
+AI_SOURCE_REAL = "real"
+DEFAULT_AI_SOURCE = AI_SOURCE_MOCK
+VALID_AI_SOURCES = (AI_SOURCE_MOCK, AI_SOURCE_REAL)
+
+
+def get_ai_source_name(environ=None):
+    """현재 설정된 AI 데이터 소스 이름("mock" 또는 "real")을 돌려준다.
+
+    값의 앞뒤 공백과 대소문자는 무시한다. 허용되지 않은 값이나 빈 문자열이면 DataSourceConfigError.
+    """
+    env = os.environ if environ is None else environ
+    raw_value = env.get(AI_SOURCE_ENV)
+    if raw_value is None:
+        return DEFAULT_AI_SOURCE
+
+    value = raw_value.strip().lower() if isinstance(raw_value, str) else ""
+    if value not in VALID_AI_SOURCES:
+        # 잘못된 설정값 자체는 메시지에 넣지 않는다.
+        raise DataSourceConfigError(
+            f"{AI_SOURCE_ENV} 값이 올바르지 않습니다. 허용 값: {', '.join(VALID_AI_SOURCES)}"
+        )
+    return value
+
+
+def ensure_ai_source_is_mock(environ=None):
+    """예시 전용 분기에 실제 AI 설정이 들어오지 않았는지 확인한다.
+
+    - mock(기본값): 통과
+    - real: 예시 전용 분기에서는 DataSourceUnavailableError (503).
+      운영자가 실제 AI 결과를 기대하고 real 을 설정했는데 예시 데이터가 나가는 일을 막는다.
+    - 잘못된 값: DataSourceConfigError (500)
+    """
+    if get_ai_source_name(environ) == AI_SOURCE_REAL:
+        raise DataSourceUnavailableError("실제 AI 설정에서 예시 응답을 사용할 수 없습니다.")

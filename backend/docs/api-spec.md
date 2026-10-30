@@ -1,7 +1,7 @@
 # WearCare Mate 백엔드 REST API 명세 (초안)
 
 > 상태: **초안(Draft)** · 작성: 파트3 백엔드/인프라 담당
-> 갱신: `/dashboard`, `/ai-guide`(프론트 API.md 기준) 추가, Athena REAL 모드(로컬 검증만) 반영
+> 갱신: 2026-10-31 실제 Athena·AI/ML 연동 및 별도 Lambda 콘솔 검증 반영
 > 목적: 프론트엔드 · 데이터 · AI/ML 팀과 협의하기 위한 API 계약(Contract) 초안
 
 이 문서는 아직 **확정본이 아닙니다.** 팀 협의로 바뀔 수 있으며,
@@ -23,7 +23,7 @@
 ## 1. 공통 규칙 (임시 설계안 🟡)
 
 ### 1.1 Base URL
-- 🟡 미확정: API Gateway 배포 후 확정됩니다. 문서에서는 상대 경로만 표기합니다.
+- 공개 API: https://j3cwx5vmwj.execute-api.ap-northeast-2.amazonaws.com (현재 예시 데이터 모드). 실제 연동 검증은 별도 비공개 테스트 Lambda에서 수행했습니다.
 - 이벤트 형식: 🟢 **API Gateway HTTP API, payload format 2.0** 기준 (현재 구현된 `GET /health` 와 동일).
 
 ### 1.2 공통 응답 형식
@@ -316,52 +316,46 @@
 
 ---
 
-### 4.6 GET /dashboard — 대시보드 전체 (🟢 MOCK / 🟡 REAL 걸음 수)
+### 4.6 GET /dashboard
 
-- **목적**: 프론트엔드 대시보드 화면 전체를 한 번에 채운다.
-- **스키마 기준**: 🟢 프론트엔드 `API.md` 의 JSON 스키마를 그대로 따른다. 필드 이름·타입을 바꾸지 않는다.
-  최상위 키: `user`, `summaryStats`, `timeseries`, `sleepStages`, `anomalies`, `aiGuide`, `notifications`
-- **요청 파라미터**: 없음. 쿼리를 보내도 사용하지 않는다. (`userId` 를 보내도 조회 대상이 바뀌지 않음)
-- **MOCK 모드** (`DATA_SOURCE` 미설정 또는 `mock`): 전 항목 예시 데이터.
-  실제 결과로 오인되지 않도록 화면에 보이는 문자열에 표시한다.
-  (`user.name="예시 사용자"`, `deltaLabel="예시 데이터"`, `title` 앞 `[예시]`,
-  `aiGuide.model="MOCK · 실제 AI 생성 아님"`, 가이드 본문에 의료 면책 문구)
-- **REAL 모드** (개발·통합 테스트 전용, 🟡 로컬 검증만):
-  - 진입 조건: `DATA_SOURCE=real` + `ENABLE_REAL_DATA_TESTING=true` + `DASHBOARD_USER_ID`
-  - 조회 대상: `DASHBOARD_USER_ID` 사용자 1명 (요청에서 사용자를 받지 않음)
-  - ⚠️ `DASHBOARD_USER_ID` 는 개발용 데모 대상 지정일 뿐 인증·인가를 대신하지 않는다.
+쿼리 파라미터로 조회 대상을 변경하지 않습니다. 기본 DATA_SOURCE/AI_SOURCE는 mock입니다.
 
-  | 항목 | REAL 모드 내용 |
-  | ---- | -------------- |
-  | `summaryStats` | steps 카드 1개만 (Athena 실제 데이터). 수면·심박·점수 카드는 넣지 않음 |
-  | `timeseries.steps` | Athena 실제 데이터. 기준 주 중 데이터가 있는 날만 (7개보다 적을 수 있음) |
-  | `timeseries.sleep` / `heartRate` | `[]` (데이터 없음, 임의 수치 생성 안 함) |
-  | `sleepStages` | `{"totalLabel": "데이터 없음", "segments": []}` |
-  | `user` | 개발용 데모 표시 문구 (사용자 ID 미포함) |
-  | `anomalies` / `aiGuide` / `notifications` | `[예시]` 표시가 있는 MOCK (AI/ML·SNS 연동 전) |
+- DATA_SOURCE=real, AI_SOURCE=mock: Athena 걸음 수 통계. AI/알림 항목은 예시 표시 유지.
+- AI_SOURCE=real: DATA_SOURCE=real, ENABLE_REAL_DATA_TESTING=true,
+  DASHBOARD_USER_ID, ML_TARGET_DATE 및 ML 호출 설정이 필요합니다.
+- REAL AI에서 user, summaryStats, timeseries, sleepStages, anomalies, aiGuide,
+  notifications, devices, guideHistory, analysis를 반환합니다.
+- 실제 데이터가 없는 수면·심박은 빈 배열, 수면 단계는 데이터 없음입니다.
+  기기·알림·가이드 저장 이력은 연결되지 않아 빈 배열입니다.
+- 통계 기준 주는 ML_TARGET_DATE 이하의 유효 기록이 있는 최근 주입니다.
+  데이터 없는 날은 0으로 채우지 않으며 지난주 비교 불가 시 delta=null입니다.
+- 실제 AI 요청은 {user_id, date, metrics: {steps}}입니다. history_steps는 AI/ML이 Athena에서 읽습니다.
+- low/medium -> warn, high -> danger. 정상 판정은 anomalies=[]입니다.
+- analysis에는 referenceDate, status, overallSeverity, evaluatedDates, note가 있습니다.
+  evaluatedDates에 포함된 날짜만 판정했습니다. 다른 차트 지점의 anomaly=false는 정상 판정이 아닙니다.
+- REAL AI의 기준일 누락/형식 오류, 2016-04-12, 유효 걸음 수 누락/0/충돌은 503입니다.
+- AWS/ML 실패는 예시 응답으로 바꾸지 않으며 503, 그 외 설정/내부 오류는 500입니다.
 
-- **걸음 수 통계 규칙 (🟡 임시 처리 방식)**
-  - 기준 주: 걸음 수가 있는 가장 최근 날짜가 속한 주(월~일). Fitbit 데이터가 2016년이므로 오늘 기준이 아님.
-    `deltaLabel` 에 기준 주 기간(`YYYY-MM-DD ~ YYYY-MM-DD`)을 표시.
-  - `value`: 기준 주에서 데이터가 있는 날만의 하루 평균, 정수 반올림 + 천 단위 콤마 (`"7,929"`).
-    데이터가 없는 날을 0걸음으로 보지 않음.
-  - `delta`: 지난주 대비 %, 정수 반올림. 지난주 데이터가 없거나 지난주 평균이 0이면 `null`.
-    ⚠️ API.md 의 `delta` 타입(number)과 다름 — 프론트 확인 필요. 0 으로 채우지 않음.
-  - `timeseries.steps[].anomaly`: AI/ML 연동 전이므로 항상 `false`.
-- **상태 코드**: 200 / 404(메서드·경로 불일치) / 500(설정 오류) / 503(스위치 꺼짐, Athena 실패·타임아웃,
-  조회 결과가 최대 행 수에 도달). REAL 실패 시 MOCK 으로 대체하지 않는다.
-- **합의 필요 사항**: 아래 6장 "프론트엔드 파트에게" 참고.
+REAL 조건은 인증을 대신하지 않습니다. 인증 없는 공개 API에서 활성화하지 않습니다.
 
----
+### 4.7 GET /ai-guide
 
-### 4.7 GET /ai-guide — AI 가이드 (🟢 MOCK)
+AI_SOURCE=mock이면 기존 예시 가이드, real이면 위와 같은 대상·기준일의 실제 AI 판정을 사용합니다.
+정상/데이터 부족일 때 가이드 생성을 강제하지 않습니다. 응답은 dashboard.aiGuide와 같습니다.
 
-- **목적**: 대시보드의 "가이드 다시 생성" 버튼.
-- **스키마**: 🟢 `/dashboard` 의 `aiGuide` 객체와 동일 — `{model, updatedAt, headline, text, actions[]}`
-- **현재 동작**: AI/ML(Bedrock) 연동 전이므로 `DATA_SOURCE` 와 관계없이 항상 예시 가이드를 반환한다.
-  Bedrock 을 호출하지 않는다. `model` 은 `"MOCK · 실제 AI 생성 아님"`.
-- **합의 필요 사항**: 실제 연동 시 매 요청마다 생성 비용이 들 수 있으므로 POST 전환·요청 제한 여부,
-  ML 출력(`guide.text` 3줄)을 `headline/text/actions` 로 나누는 방식.
+필드:
+- model, updatedAt, headline, text, actions: 기존 화면용 필드.
+- status: generated / missing / not_applicable.
+- analysisStatus: anomaly / normal / insufficient_data.
+- referenceDate: YYYY-MM-DD 기준일.
+- warnings: 생성 가이드의 출력 규칙 검사 문제 목록.
+
+정상과 데이터 부족은 not_applicable이며 analysisStatus로 구분합니다.
+이상인데 Bedrock 가이드가 없으면 missing입니다. 이 경우에도 판정 응답은 200일 수 있습니다.
+생성 성공 시 guide.lines의 첫 줄을 headline, 전체 text를 본문, 두 번째 줄을 actions로 전달합니다.
+실제 가이드가 없는 경우에는 생성된 AI 문구라고 표시하지 않습니다.
+
+매 GET 재조회에 비용/지연이 발생할 수 있습니다. 캐시, POST 전환, 요청 제한은 추가 협의 사항입니다.
 
 ---
 
@@ -370,7 +364,9 @@
 ### 🟢 확정된 사실
 - `GET /health` 는 구현·테스트 완료 (200/404/400 동작).
 - 구현된 엔드포인트 6개(`/health`, health-data, anomalies, guides, `/dashboard`, `/ai-guide`)는
-  로컬 unittest 272개로 검증됨. AWS 배포와 실제 Athena 조회는 아직 하지 않음.
+  로컬 unittest 367개로 검증됨. 공개 API는 mock, 별도 테스트 Lambda는 실제 Athena/AI 호출과 정상 API 응답 변환을 확인함.
+- AI/ML 인터페이스는 `origin/ai-ml` 의 `ml-interface-spec.md` v0.3(초안) 과 실제 코드를 기준으로
+  요청 생성·응답 검증 및 화면용 변환이 구현됨. 새 API의 이상·생성 경로 AWS 통합 검증은 남아 있음.
 - 데이터 저장소는 Athena(us-east-2, `fitbit_activity_table`)로 확인됨. 수면·심박 데이터는 없음.
 - REAL 모드는 `ENABLE_REAL_DATA_TESTING` + `DASHBOARD_USER_ID` 가 필요한 개발·통합 테스트 전용이며,
   health-data REAL 은 `DASHBOARD_USER_ID` 와 다른 사용자를 404 로 거절함.
@@ -386,7 +382,7 @@
 - 가이드 생성/저장 방식 및 출력 형식.
 - 인증·인가 방식(401/403, 토큰 도입 여부).
 - SNS 알림 채널 및 웹 푸시 전달 방식.
-- Base URL / 배포 환경.
+- 공개 API REAL 전환 전 인증·인가, CORS 및 브라우저 통합 검증.
 
 ---
 

@@ -303,7 +303,9 @@ def build_activity_query(config, user_id, date_from=None, date_to=None):
     date_to = validate_optional_date(date_to, "to")
 
     conditions = ["id = ?"]
-    parameters = [_quote_string_parameter(user_id)]
+    # Glue id is BIGINT. Send a numeric SQL parameter, not a quoted VARCHAR.
+    # Validation above allows ASCII digits only; int also normalizes leading zeros.
+    parameters = [str(int(user_id))]
     if date_from is not None:
         conditions.append("activitydate >= ?")
         parameters.append(_quote_string_parameter(date_from))

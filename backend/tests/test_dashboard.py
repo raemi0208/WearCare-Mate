@@ -34,8 +34,9 @@ AI_GUIDE_KEYS = {"model", "updatedAt", "headline", "text", "actions"}
 SEVERITIES = {"danger", "warn", "ok"}
 WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
 
-_ISOLATED_ENV_NAMES = ("DATA_SOURCE", "ENABLE_REAL_DATA_TESTING", "DASHBOARD_USER_ID")
-_ISOLATED_ENV_PREFIXES = ("ATHENA_",)
+# AI_SOURCE, ML_* 도 격리한다. (개발 PC 에 AI_SOURCE=real 이 있어도 MOCK 테스트가 안정적이도록)
+_ISOLATED_ENV_NAMES = ("DATA_SOURCE", "ENABLE_REAL_DATA_TESTING", "DASHBOARD_USER_ID", "AI_SOURCE")
+_ISOLATED_ENV_PREFIXES = ("ATHENA_", "ML_")
 
 
 class UnexpectedAwsClientCreation(BaseException):

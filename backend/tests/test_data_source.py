@@ -49,8 +49,9 @@ def make_event(method, path, query="__default__"):
 # - DATA_SOURCE: 데이터 소스 선택
 # - ENABLE_REAL_DATA_TESTING, DASHBOARD_USER_ID: REAL 조회 진입 조건
 # - ATHENA_*: Athena 조회 설정
-_ISOLATED_ENV_NAMES = (DATA_SOURCE_ENV, "ENABLE_REAL_DATA_TESTING", "DASHBOARD_USER_ID")
-_ISOLATED_ENV_PREFIXES = ("ATHENA_",)
+# - AI_SOURCE, ML_*: AI 데이터 소스와 AI/ML 호출 설정
+_ISOLATED_ENV_NAMES = (DATA_SOURCE_ENV, "ENABLE_REAL_DATA_TESTING", "DASHBOARD_USER_ID", "AI_SOURCE")
+_ISOLATED_ENV_PREFIXES = ("ATHENA_", "ML_")
 
 
 def _is_isolated_env(name):
