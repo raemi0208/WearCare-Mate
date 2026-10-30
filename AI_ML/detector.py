@@ -165,7 +165,7 @@ SYSTEM_PROMPT = """너는 웨어러블 데이터를 바탕으로 건강 습관�
   - 3줄: 증상이 지속되거나 불편하면 전문가와 상담하라는 문장으로 한다."""
 
 _LABEL = {
-    "steps": ("걸음 수", "보", 0), "sleep_hours": ("수면 시간", "시간", 1),
+    "steps": ("걸음 수", "걸음", 0), "sleep_hours": ("수면 시간", "시간", 1),
     "heart_rate_variability": ("심박 변이도(HRV)", "", 1), "stress_level": ("스트레스 점수(10점 만점)", "", 1),
     "movement_during_sleep": ("수면 중 움직임", "", 1),
 }
