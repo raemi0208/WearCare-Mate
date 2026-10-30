@@ -6,7 +6,7 @@ API Gateway(프록시 통합) 또는 직접 호출의 입력(스펙 6번)을 받
   BEDROCK_MODEL_ID  기본값 global.anthropic.claude-haiku-4-5-20251001-v1:0 (서울에서 노트북 호출 확인함). 빈 문자열로 두면 가이드 생략
   BEDROCK_REGION    기본 ap-northeast-2
   ATHENA_REGION(us-east-2) ATHENA_DB ATHENA_WORKGROUP ATHENA_OUTPUT ATHENA_TIMEOUT(10초)
-  STEPS_TABLE USER_COL DATE_COL STEPS_COL  걸음 수 테이블/컬럼명 (기본 fitbit_activity_table / userid / activitydate / totalsteps)
+  STEPS_TABLE USER_COL DATE_COL STEPS_COL  걸음 수 테이블/컬럼명 (기본 fitbit_activity_table / id / activitydate / totalsteps)
 필요 권한(Lambda 실행 역할): bedrock:InvokeModel, 그리고 us-east-2의 athena:StartQueryExecution/GetQueryExecution/GetQueryResults,
   glue:GetDatabase/GetTable/GetPartitions, 데이터 버킷 읽기 + 결과 위치(ATHENA_OUTPUT) 쓰기.
 요청에 history_steps가 있으면 Athena를 조회하지 않고 그 값을 쓴다.
@@ -27,7 +27,7 @@ ATHENA_WORKGROUP = os.environ.get("ATHENA_WORKGROUP", "")
 ATHENA_OUTPUT = os.environ.get("ATHENA_OUTPUT", "s3://wearcare-mate-bucket-2026/athena-results/")
 ATHENA_TIMEOUT = float(os.environ.get("ATHENA_TIMEOUT", "10"))
 STEPS_TABLE = os.environ.get("STEPS_TABLE", "fitbit_activity_table")
-USER_COL = os.environ.get("USER_COL", "userid")
+USER_COL = os.environ.get("USER_COL", "id")
 DATE_COL = os.environ.get("DATE_COL", "activitydate")
 STEPS_COL = os.environ.get("STEPS_COL", "totalsteps")
 
