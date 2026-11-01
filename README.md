@@ -112,3 +112,9 @@ REACT_APP_API_BASE=https://your-api-gateway-url
 ## 담당
 
 헬스케어 3조 — 백엔드 & 프론트엔드 파트 (웹 대시보드 UI)
+
+```
+frontend/
+  public/
+    login.html           더미 로그인 페이지
+```
