@@ -113,6 +113,8 @@ REACT_APP_API_BASE=https://your-api-gateway-url
 
 헬스케어 3조 — 백엔드 & 프론트엔드 파트 (웹 대시보드 UI)
 
+## 수정사항
+
 ```
 frontend/
   public/
