@@ -24,9 +24,14 @@ PR #8 (`frontend-api-integration` → `frontend`)의 변경 범위와 연동 시
 - 주소는 `src/services/api.js`가 `REACT_APP_API_BASE`에서 읽습니다.
   - 비어 있으면 API를 호출하지 않고 `src/data/mockData.js`의 예시 데이터로 동작합니다.
   - 값이 있으면 `GET {REACT_APP_API_BASE}/dashboard`, `GET {REACT_APP_API_BASE}/ai-guide`를 호출합니다.
-- 사용 방법: `.env.example`을 `.env`로 복사한 뒤 `npm start`를 다시 시작하거나 다시 빌드합니다.
+- 사용 방법: `.env.example`을 **`frontend/.env.local`**로 복사한 뒤 `npm start`를 다시 시작하거나 다시 빌드합니다.
   (CRA는 빌드 시점에 값을 넣으므로 실행 중에 바꿔도 반영되지 않습니다.)
-- `.env`는 루트 `.gitignore`의 `.env` 규칙으로 커밋에서 제외됩니다. 자격 증명은 넣지 않습니다.
+- ⚠️ 이 브랜치의 루트 `.gitignore`는 CRA 기본값이라 **`.env`는 Git에서 제외되지 않습니다.**
+  제외되는 것은 `.env.local`, `.env.development.local`, `.env.test.local`, `.env.production.local`입니다.
+  그래서 로컬 설정은 `.env.local`에 둡니다. (`git check-ignore -v frontend/.env.local`로 확인 가능)
+  자격 증명은 어떤 파일에도 넣지 않습니다.
+- (정정) 이전 버전의 이 문서와 `.env.example`은 "`.env`가 루트 `.gitignore`로 제외된다"고 안내했지만
+  사실이 아니었습니다. 백엔드 브랜치의 `.gitignore`를 잘못 참고한 내용입니다.
 - 공개 API(`https://j3cwx5vmwj.execute-api.ap-northeast-2.amazonaws.com`)는 **현재 예시 데이터 모드**입니다.
   실제 Athena·AI/ML 응답은 API Gateway에 연결되지 않은 별도 테스트 함수에서만 확인했습니다.
   프론트엔드에서 그 테스트 함수를 직접 호출하도록 바꾸지 마세요.
@@ -51,18 +56,38 @@ PR #8 (`frontend-api-integration` → `frontend`)의 변경 범위와 연동 시
 
 - 로컬: `http://localhost:3000/login.html` (로그인 화면), `http://localhost:3000/` (대시보드).
   프론트엔드 담당자가 공유한 로컬 개발 서버 주소입니다.
-- 배포 주소(Amplify 등): **아직 확인되지 않았습니다.** CORS 허용 대상도 이 주소가 정해진 뒤에 등록합니다.
+- 배포 주소(Amplify 등): **아직 확인되지 않았습니다.** 현재 CORS에는 로컬 주소 `http://localhost:3000`만 등록되어 있으며,
+  배포 주소가 정해지면 그 Origin을 추가해야 합니다. 전체 허용(`*`)은 쓰지 않습니다.
 
 ## 검증
 
 - `5665f860` 기준: 사용자 터미널에서 Jest 테스트 8개 통과, 프로덕션 빌드 성공을 확인했습니다.
   테스트 범위: 6개 메뉴 전환, 실제 응답의 빈 배열, nullable delta, 가이드 상태와 경고,
   재조회 실패 후 복구.
-- 하지 않은 것: 브라우저에서 로그인 화면 → 대시보드 이동 확인, 공개 API를 통한 실제 데이터·AI 통합 확인, 시각 검수.
+- `d0f582d1` 기준: Jest 테스트 8개 통과, 프로덕션 빌드 성공(저장소 밖 임시 폴더로 출력).
+
+### 로컬 브라우저 연결 확인 (2026-11-02, 사용자 확인)
+
+- 실행 주소: `http://localhost:3000` (로컬 개발 서버. 배포 주소 아님)
+- `frontend/.env.local`에 `REACT_APP_API_BASE`를 공개 API 기본 주소로 설정 (커밋하지 않음)
+- API Gateway CORS에 `http://localhost:3000` 등록, `$default` 스테이지 자동 배포 Enabled
+- 공개 예시 API 기반 대시보드 표시 성공
+- AI 가이드 예시 화면 표시 성공
+- 가이드 재조회 시 브라우저 Network에서 `/ai-guide` 요청 200 확인
+
+이 확인은 **공개 API의 예시 데이터(mock) 응답**을 화면에 연결한 것입니다.
+실제 Athena 데이터나 실제 생성 가이드를 브라우저에 표시한 검증이 아닙니다.
+
+### 하지 않은 것
+
+- 로그인 화면 → 대시보드 이동 확인 (이 브랜치에는 `login.html`이 없음)
+- 공개 API를 통한 실제 데이터·AI 통합 확인
+- 실제 생성 가이드(Bedrock)의 브라우저 표시 확인
+- 배포 주소에서의 CORS·화면 확인, 시각 검수
 
 ## 팀에서 확인할 사항
 
-1. 프론트엔드 배포 주소를 받아 백엔드 API Gateway CORS에 등록.
+1. 프론트엔드 배포 주소를 받아 백엔드 API Gateway CORS에 추가 등록 (현재는 `http://localhost:3000`만 등록).
 2. 실제 데이터 공개 전 백엔드 인증·인가와 데이터 접근 범위 확정. (로그인 화면은 인증을 대신하지 않음)
 3. 새 응답의 `analysis`, 가이드 `status`/`warnings`, `delta=null`을 최종 API 명세에 반영.
 4. 그래프의 `anomaly: false`는 그날이 정상이라는 뜻이 아님. `analysis.evaluatedDates`에 있는 날짜만 판정됨.
