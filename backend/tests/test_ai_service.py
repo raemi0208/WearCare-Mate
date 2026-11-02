@@ -85,6 +85,11 @@ class AIServiceTest(unittest.TestCase):
         self.assertEqual(b["analysisStatus"], "insufficient_data")
         self.assertNotEqual(a["headline"], b["headline"])
 
+    def test_activity_drop_desc_uses_step_unit(self):
+        anomaly = ai_service.anomalies_for_frontend(result_for())[0]
+        self.assertEqual(anomaly["desc"], "기준일 걸음 수 2,100걸음 · 과거 기록 평균 12,271걸음")
+        self.assertNotIn("보", anomaly["desc"])
+
     def test_warning_details_are_preserved(self):
         result = result_for()
         result["guide"]["warnings"] = ["줄 수 2"]

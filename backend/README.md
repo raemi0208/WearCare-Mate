@@ -7,9 +7,13 @@ API Gateway HTTP API(payload 2.0)와 Python 3.13 Lambda 기반 백엔드입니�
 - 공개 백엔드와 API Gateway는 서울 ap-northeast-2에 배포했습니다. 공개 /health, /dashboard, /ai-guide 호출을 확인했으며 공개 API는 예시 데이터 모드입니다.
 - 별도 wearcare-mate-athena-test에서 실제 Athena 조회, AI/ML Lambda 호출 및 /dashboard, /ai-guide 응답 변환을 검증했습니다. 기준일 2016-04-10, 정상 판정입니다.
 - wearcare-mate-ml에서 가상 이상 입력을 통한 실제 Bedrock 가이드 생성을 별도로 확인했습니다.
-- 새 API 변환 경로의 이상 판정·가이드 생성은 로컬 테스트로 검증했으며 AWS에서는 정상 경로만 확인했습니다.
+- 2026-11-02 콘솔 전용 wearcare-mate-ml-virtual-check에서 가상 이상 입력 → 실제 AI/ML 호출 → 실제 Bedrock 가이드 →
+  백엔드 화면용 변환을 확인했습니다(Lambda 실행 성공, 응답 verdict PASS). 가상 입력이므로 Athena 실제 데이터는 포함하지 않습니다.
+- Athena 실제 데이터에서 이상이 판정되어 가이드까지 반환되는 흐름과 공개 API 경로는 아직 AWS에서 확인하지 않았습니다.
+- 화면용 이상 설명의 걸음 수 단위를 "걸음"으로 통일한 수정은 아직 AWS에 배포하지 않았습니다.
 - Athena·Glue·S3는 오하이오 us-east-2, 백엔드·AI/ML Lambda와 Bedrock 호출 시작 리전은 서울입니다.
-- 인증·인가, 프론트엔드 CORS, 공개 API 실제 데이터 전환 및 브라우저 통합 검증은 미완료입니다.
+- API Gateway CORS에 로컬 개발 주소 http://localhost:3000을 등록했고, 로컬 브라우저에서 공개 예시 API 표시를 확인했습니다.
+  배포 주소의 CORS, 인증·인가, 공개 API 실제 데이터 전환, 실제 생성 가이드의 브라우저 통합 검증은 미완료입니다.
 - SNS, 기기 연결, 가이드 이력 저장, 프로필 서버 저장과 SageMaker 엔드포인트 호출은 구현하지 않았습니다.
 
 GitHub push는 AWS를 변경하지 않습니다. REAL 모드의 사용자 지정과 테스트 스위치는 인증·인가가 아니므로 인증 없는 공개 API에서 활성화하지 마세요.
@@ -86,6 +90,8 @@ Bedrock 모델과 AI/ML 환경변수는 AI/ML 담당자가 관리합니다.
 - src/ml_adapter.py, ml_client.py: 요청 생성, Lambda 호출, 응답 검증.
 - src/ai_service.py: REAL API 조립과 화면용 변환.
 - src/ml_integration_check.py: 고정 공개 데이터 ID/날짜의 콘솔 전용 검증 핸들러. API Gateway나 Function URL에 연결하지 마세요.
+- src/ml_virtual_anomaly_check.py: 고정 가상 입력의 콘솔 전용 이상 경로 검증 핸들러(Athena 미사용, Bedrock 비용 발생 가능).
+  API Gateway 이벤트는 거절합니다. API Gateway나 Function URL에 연결하지 마세요.
 
 ## 로컬 검증
 
@@ -95,6 +101,6 @@ backend 폴더에서 Python 3.13으로 실행합니다.
 python -m unittest discover -s tests
 ```
 
-367개 테스트가 가짜 AWS 클라이언트/패치된 연결로 실행됩니다. 실제 AWS에는 접속하지 않습니다.
+377개 테스트가 가짜 AWS 클라이언트/패치된 연결로 실행됩니다(2026-11-02 로컬 실행 기준). 실제 AWS에는 접속하지 않습니다.
 MOCK 경로와 테스트는 표준 라이브러리로 실행하며 실제 AWS 경로는 boto3/botocore가 필요합니다.
 현재 Lambda 런타임 포함 SDK를 사용한 배포를 검증했습니다. SDK 버전 고정은 별도 작업입니다.

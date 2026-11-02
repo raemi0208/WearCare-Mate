@@ -84,8 +84,9 @@ def anomalies_for_frontend(result):
         "severity": severity[item["severity"]],
         "title": titles.get(item["type"], "지표 이상 감지"),
         "time": result["date"],
-        "desc": (f"기준일 걸음 수 {item['value']:,.0f}보 · "
-                 f"과거 기록 평균 {item['baseline_mean']:,.0f}보")
+        # 걸음 수 단위는 AI/ML 가이드(4732493c)와 같은 "걸음"으로 통일한다.
+        "desc": (f"기준일 걸음 수 {item['value']:,.0f}걸음 · "
+                 f"과거 기록 평균 {item['baseline_mean']:,.0f}걸음")
                  if item["type"] == "ACTIVITY_DROP" else "AI/ML 지표 판정 결과입니다.",
     } for index, item in enumerate(result["anomalies"])]
 

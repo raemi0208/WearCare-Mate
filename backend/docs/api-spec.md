@@ -364,7 +364,8 @@ AI_SOURCE=mock이면 기존 예시 가이드, real이면 위와 같은 대상·�
 ### 🟢 확정된 사실
 - `GET /health` 는 구현·테스트 완료 (200/404/400 동작).
 - 구현된 엔드포인트 6개(`/health`, health-data, anomalies, guides, `/dashboard`, `/ai-guide`)는
-  로컬 unittest 367개로 검증됨. 공개 API는 mock, 별도 테스트 Lambda는 실제 Athena/AI 호출과 정상 API 응답 변환을 확인함.
+  로컬 unittest 377개로 검증됨. 공개 API는 mock, 별도 테스트 Lambda는 실제 Athena/AI 호출과 정상 API 응답 변환을 확인함.
+  콘솔 전용 가상 이상 입력 검증으로 실제 AI/ML·Bedrock 가이드 생성과 화면용 변환(PASS)을 확인함(Athena 실제 데이터 미포함).
 - AI/ML 인터페이스는 `origin/ai-ml` 의 `ml-interface-spec.md` v0.3(초안) 과 실제 코드를 기준으로
   요청 생성·응답 검증 및 화면용 변환이 구현됨. 새 API의 이상·생성 경로 AWS 통합 검증은 남아 있음.
 - 데이터 저장소는 Athena(us-east-2, `fitbit_activity_table`)로 확인됨. 수면·심박 데이터는 없음.
