@@ -1,4 +1,4 @@
-# WearCare Mate - AI/ML 인터페이스 스펙 (초안 v0.3)
+# WearCare Mate - AI/ML 인터페이스 스펙 (v0.4)
 
 - 작성: 조채환 (AI/ML 파트) / 2026-10-30
 - 상태: **초안 - 팀 확인 필요** (확인 요청은 10번)
@@ -150,10 +150,13 @@
   ],
   "anomaly_score": 0.71,
   "guide": {
-    "text": "(Bedrock이 생성한 3줄 가이드)",
+    "text": "(Bedrock이 생성한 3줄 가이드. 줄 사이는 \n)",
+    "lines": ["(1줄: 이상 징후 요약)", "(2줄: 권장 행동)", "(3줄: 전문가 상담 안내)"],
     "model_id": "(사용한 모델 ID)",
+    "warnings": [],
     "generated_at": "2016-04-11T08:00:00+09:00"
   },
+  "alert_sent": true,
   "model_version": "activity-zscore-v0.2+pop-v0.3"
 }
 ```
@@ -165,8 +168,13 @@
 | anomalies[].basis | `personal` (본인 기록 대비) / `population` (전체 분포 대비) |
 | anomaly_score | 집단 기준 모델의 종합 점수 (0~1). 개인 기준만 쓰면 `null` |
 | guide | status가 anomaly일 때만 생성. 그 외 `null` |
+| guide.lines | 가이드 3줄의 배열. **화면에는 이 값을 한 줄씩 그리면 된다** (`text`는 같은 내용을 `\n`으로 이은 것) |
+| guide.warnings | 생성 규칙 위반 경고 목록. 비어 있으면 규칙을 모두 지킨 것. 값이 있어도 가이드는 그대로 표시하면 된다 |
+| alert_sent | SNS 알림을 보냈으면 `true` (아래 규칙 참고) |
 
 - **SNS 알림**: `overall_severity`가 `medium` 이상일 때만. `low`는 대시보드에만 표시.
+  - AI/ML Lambda(`wearcare-mate-ml`, 서울)에서 직접 발송한다. 주제: `wearcare-mate-alert`
+  - 발송 여부는 응답의 `alert_sent`로 알 수 있다. 발송에 실패해도 탐지 결과는 그대로 돌려준다 (`alert_sent: false`).
 - 오류: `{"error": {"code": "INVALID_INPUT", "message": "..."}}` (code 예: INVALID_INPUT, MODEL_ERROR, GUIDE_FAILED). 가이드 생성이 실패해도 탐지 결과는 돌려준다 (`guide: null`).
 
 ## 8. Bedrock 가이드 규칙
@@ -205,9 +213,16 @@
 6. **백엔드**: 가이드 생성 시점 (요청 시 동기 / 이상 탐지 때 사전 생성), 판정 호출 시점(하루 종료 후)이 가능한가.
 7. **전체**: 4번(개인), 5번(집단) 심각도 기준과 SNS 알림 기준(medium 이상)이 시나리오에 맞는가.
 
+## 11. 데이터 주의사항 (2026-11-03 확인)
+
+- `fitbit_activity_table`의 마지막 날 **`2016-04-12`는 부분 수집**이다. 그날 24명 평균이 1,762걸음(전체 평균 6,547걸음), 0걸음 5명, 24명 중 23명이 본인 평소의 60% 미만이다.
+- 이 날짜로 탐지를 돌리면 24명 중 22명이 이상으로 잡힌다 (high 12 / medium 4 / low 6). 하루 전 `2016-04-11`은 25명 중 5명으로 정상 범위다.
+- **데모와 통합 테스트의 기준일은 `2016-04-11` 이전으로 잡는다.**
+
 ## 변경 이력
 
 - v0.1 (2026-10-22): 초안 작성
 - v0.2 (2026-10-30): 실제 데이터 확인 반영, 탐지 방식 분리 (개인 기준선 / 집단 기준), 기준선 5~14개 기록, 심각도 3단계와 주입 테스트 결과 추가, RHR_HIGH 보류
 - v0.3 (2026-10-30): 집단 기준 확정 (나쁜 방향 z, 심각도 2.0/2.5/3.0, 집단 평균·표준편차), SLEEP_QUALITY_LOW를 SLEEP_RESTLESS로 교체, 수면 점수 제외, 움직임 음수 보정, 문서 내 확인 요청 번호 정정
 - v0.3 추가 (2026-10-30): Bedrock 규칙에 anomalies 심각도순 정렬과 입력 순서 처리, 수치 인용, 줄 처리 규칙 추가
+- v0.4 (2026-11-03): Lambda 배포 완료(`wearcare-mate-ml`, 서울) 및 Athena 조회·Bedrock 호출 실제 동작 확인, 걸음 수 단위를 "보"에서 "걸음"으로 통일, SNS 알림 연동과 `alert_sent` 필드 추가, 출력에 `guide.lines`·`guide.warnings` 명시, 11번 데이터 주의사항(2016-04-12 부분 수집) 추가
