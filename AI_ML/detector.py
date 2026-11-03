@@ -26,6 +26,9 @@ POP_THRESHOLDS = [(3.0, "high"), (2.5, "medium"), (2.0, "low")]
 
 # ---- 개인 기준선 (스펙 4번) ----
 WINDOW, MIN_RECORDS, STD_FLOOR = 14, 5, 500.0
+# 부분 수집 방어: 하루 기록 시간(활동+비활동 분)이 이 값 미만이면 걸음 수 판정을 하지 않는다.
+# 기준 800분이면 평소일은 2.8%만 제외되고 2016-04-12는 24명 중 21명이 걸러진다.
+MIN_TRACKED_MINUTES = 800.0
 
 # 테이블 컬럼명(wearable_sleep_table_fixed, Fitbit)을 그대로 넘겨도 되도록 별칭 허용
 METRIC_ALIASES = {"sleep_duration_hours": "sleep_hours", "totalsteps": "steps", "total_steps": "steps"}
@@ -66,11 +69,14 @@ def population_check(metrics):
     return anomalies, bad_vec
 
 
-def personal_check(steps, history_steps):
+def personal_check(steps, history_steps, tracked_minutes=None):
     """걸음 수 개인 기준선. history_steps: 기준일 직전 기록(오래된 순 또는 무관, 마지막 최대 14개 사용).
-    0걸음은 기기 미착용으로 보고 제외. 반환: (anomaly 또는 None, 'ok'|'insufficient_data')"""
+    0걸음은 기기 미착용으로 보고 제외. tracked_minutes가 주어지고 MIN_TRACKED_MINUTES 미만이면
+    부분 수집으로 보고 판정하지 않는다. 반환: (anomaly 또는 None, 'ok'|'insufficient_data')"""
     if steps is None:
         return None, "insufficient_data"
+    if tracked_minutes is not None and tracked_minutes < MIN_TRACKED_MINUTES:
+        return None, "insufficient_data"  # 하루치가 다 모이지 않은 날
     hist = [h for h in history_steps if h and h > 0][-WINDOW:]
     if len(hist) < MIN_RECORDS:
         return None, "insufficient_data"
@@ -110,7 +116,7 @@ def detect(inp, history_steps=None, iforest=None):
     m = {METRIC_ALIASES.get(k, k): v for k, v in (inp.get("metrics", {}) or {}).items()}  # Athena 컬럼명도 받는다
     anomalies, checked = [], 0
 
-    pers, pstat = personal_check(m.get("steps"), history_steps or [])
+    pers, pstat = personal_check(m.get("steps"), history_steps or [], m.get("tracked_minutes"))
     if pstat == "ok":
         checked += 1
     if pers:
