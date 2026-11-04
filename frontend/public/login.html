@@ -5,40 +5,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>WearCare Mate · 로그인</title>
+  <!-- 공용 디자인 토큰 (대시보드와 동일한 색상 · 글꼴 · 간격을 공유) -->
+  <link rel="stylesheet" href="theme.css" />
   <style>
-    /* WearCare Mate - 디자인 토큰 (index.css와 동일하게 유지) */
-    :root {
-      --color-bg: #e9e9ec;
-      --color-surface: #f7f7f8;
-      --color-surface-2: #ffffff;
-      --color-panel: #ededf0;
-      --color-border: #d6d6db;
-      --color-border-strong: #1a1a1a;
-
-      --color-ink: #141414;
-      --color-ink-soft: #3f3f46;
-      --color-muted: #71717a;
-      --color-faint: #a1a1aa;
-
-      --radius-sm: 8px;
-      --radius-md: 14px;
-      --radius-pill: 999px;
-
-      --shadow-sm: 0 1px 2px rgba(20, 20, 20, 0.06);
-      --shadow-md: 0 6px 20px rgba(20, 20, 20, 0.08);
-
-      --space-1: 4px;
-      --space-2: 8px;
-      --space-3: 12px;
-      --space-4: 16px;
-      --space-5: 24px;
-      --space-6: 32px;
-      --space-7: 48px;
-
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
-        "Malgun Gothic", "맑은 고딕", Roboto, "Helvetica Neue", Arial, sans-serif;
-    }
-
     * {
       box-sizing: border-box;
     }
@@ -134,6 +103,13 @@
     .login-card__desc {
       font-size: 13px;
       color: var(--color-muted);
+      margin-bottom: var(--space-3);
+    }
+
+    .login-card__note {
+      font-size: 12px;
+      color: #dc2626;
+      line-height: 1.5;
       margin-bottom: var(--space-5);
     }
 
@@ -207,6 +183,7 @@
     <div class="login-card__body">
       <h1 class="login-card__heading">로그인</h1>
       <p class="login-card__desc">계정 정보를 입력해 대시보드에 접속하세요.</p>
+      <p class="login-card__note">* 이 페이지는 시연용으로, log in 버튼을 눌러도 Dashboard로 이동됩니다.</p>
 
       <form class="form" onsubmit="goToDashboard(event)">
         <div class="form__field">
