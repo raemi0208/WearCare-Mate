@@ -4,7 +4,7 @@ import React from "react";
 export default function StatCard({ icon, label, value, unit, delta = 0, deltaLabel }) {
   const dir = delta > 0 ? "up" : delta < 0 ? "down" : "flat";
   const arrow = delta > 0 ? "▲" : delta < 0 ? "▼" : "–";
-  const deltaText =
+  const deltaText = delta == null ? `비교 데이터 없음 · ${deltaLabel || ""}` :
     delta === 0 ? deltaLabel : `${arrow} ${Math.abs(delta)}% · ${deltaLabel}`;
 
   return (

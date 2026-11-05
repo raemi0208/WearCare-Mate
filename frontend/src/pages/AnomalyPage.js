@@ -32,17 +32,17 @@ export default function AnomalyPage({ data }) {
         <div className="card stat">
           <div className="stat__label">분석 엔진</div>
           <div className="stat__value" style={{ fontSize: 18 }}>
-            SageMaker
+            {data.analysis ? "활동량 기준선" : "예시 분석"}
           </div>
-          <div className="stat__delta is-flat">실시간 이상 탐지</div>
+          <div className="stat__delta is-flat">{data.analysis?.referenceDate || "예시 데이터"}</div>
         </div>
       </div>
 
       <Card
         title="이상 패턴 상세 내역"
-        subtitle="Amazon SageMaker가 평소 생활 패턴 대비 감지한 항목"
+        subtitle={data.analysis?.note || "예시 이상 탐지 내역"}
       >
-        <AnomalyPanel anomalies={anomalies} embedded />
+        <AnomalyPanel anomalies={anomalies} analysis={data.analysis} embedded />
       </Card>
     </div>
   );

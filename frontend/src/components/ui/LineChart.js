@@ -10,7 +10,7 @@ export default function LineChart({ data = [], height = 220 }) {
   const innerH = height - padY * 2;
 
   if (data.length === 0) {
-    return <div className="chart" />;
+    return <div className="chart"><p>조회된 데이터가 없습니다.</p></div>;
   }
 
   const values = data.map((d) => d.value);

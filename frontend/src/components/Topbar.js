@@ -10,7 +10,7 @@ export default function Topbar({ user, title, subtitle, onProfileClick }) {
       </div>
 
       <div className="topbar__right">
-        <Badge variant="normal">● 실시간 동기화</Badge>
+        <Badge variant="ghost">기록 데이터 조회</Badge>
         {user && (
           <button
             type="button"
