@@ -5,7 +5,7 @@ import LineChart from "./ui/LineChart";
 const TABS = [
   { id: "sleep", label: "수면", unit: "시간" },
   { id: "heartRate", label: "심박", unit: "bpm" },
-  { id: "steps", label: "활동량", unit: "보" },
+  { id: "steps", label: "활동량", unit: "걸음" },
 ];
 
 export default function TrendChart({ timeseries }) {

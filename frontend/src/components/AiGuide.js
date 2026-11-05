@@ -3,6 +3,13 @@ import React from "react";
 export default function AiGuide({ guide, onRegenerate, regenerating = false }) {
   if (!guide) return null;
 
+  // 본문은 lines 배열을 우선 사용해 줄별로 표시하고,
+  // lines가 없거나 비어있으면 text의 줄바꿈(\n)을 유지해 표시합니다.
+  const bodyLines =
+    Array.isArray(guide.lines) && guide.lines.length > 0
+      ? guide.lines
+      : (guide.text || "").split("\n");
+
   return (
     <section className="card ai-guide">
       <header className="card__header">
@@ -14,7 +21,11 @@ export default function AiGuide({ guide, onRegenerate, regenerating = false }) {
 
       <div className="card__body">
         <p className="ai-guide__headline">{guide.headline}</p>
-        <p className="ai-guide__text">{guide.text}</p>
+        <div className="ai-guide__text">
+          {bodyLines.map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
 
         <div className="ai-guide__actions">
           {guide.actions.map((action, i) => (

@@ -56,7 +56,7 @@ export const summaryStats = [
     icon: "👟",
     label: "평균 걸음 수",
     value: "7,929",
-    unit: "보",
+    unit: "걸음",
     delta: -2,
     deltaLabel: "지난주 대비",
   },

@@ -6,7 +6,7 @@ import LineChart from "../components/ui/LineChart";
 const SERIES = [
   { key: "sleep", title: "수면 시간", unit: "시간", icon: "🌙" },
   { key: "heartRate", title: "안정 시 심박", unit: "bpm", icon: "❤️" },
-  { key: "steps", title: "활동량", unit: "보", icon: "👟" },
+  { key: "steps", title: "활동량", unit: "걸음", icon: "👟" },
 ];
 
 function avg(arr) {

@@ -509,6 +509,11 @@
   line-height: 1.6;
 }
 
+/* 본문을 줄별로 표시할 때 각 줄 간 여백 */
+.ai-guide__text p + p {
+  margin-top: var(--space-2);
+}
+
 .ai-guide__actions {
   margin-top: var(--space-5);
   display: flex;
