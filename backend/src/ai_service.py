@@ -14,8 +14,8 @@ from src.dashboard_service import (
 )
 from src.data_source import DataSourceUnavailableError
 from src.ml_adapter import (
-    TargetNotEligibleError, build_detection_request, step_anomaly_dates,
-    summarize_detection,
+    TargetNotEligibleError, build_detection_request, collect_daily_tracked_minutes,
+    step_anomaly_dates, summarize_detection,
 )
 from src.ml_client import MLClient, MLConfig, create_lambda_client
 from src.real_health_data import get_allowed_user_id, is_real_data_testing_enabled
@@ -40,7 +40,8 @@ def _load_result(environ=None, athena_client_factory=None, ml_client_factory=Non
     items = fetch_dashboard_activity_items(client_factory=athena_client_factory, environ=env)
     try:
         request = build_detection_request(
-            user_id, target, collect_daily_steps(items), excluded_dates=("2016-04-12",)
+            user_id, target, collect_daily_steps(items), excluded_dates=("2016-04-12",),
+            daily_tracked_minutes=collect_daily_tracked_minutes(items),
         )
     except TargetNotEligibleError:
         raise DataSourceUnavailableError("기준일에 판정 가능한 걸음 수가 없습니다.") from None
@@ -50,7 +51,11 @@ def _load_result(environ=None, athena_client_factory=None, ml_client_factory=Non
 
 
 def guide_for_frontend(result):
-    """Preserve frontend's model/updatedAt/headline/text/actions fields."""
+    """Preserve frontend's model/updatedAt/headline/text/actions fields.
+
+    guide.lines 는 lines 로 그대로 전달한다(줄별 표시용). alertSent 는 AI/ML 의 SNS 발송 여부
+    (true/false/null)를 표시·로그용으로 넘긴다. 백엔드는 SNS 를 직접 발송하지 않는다.
+    """
     guide = result["guide"]
     summary = summarize_detection(result)
     common = {
@@ -58,11 +63,13 @@ def guide_for_frontend(result):
         "referenceDate": result["date"],
         "updatedAt": guide["generated_at"] if guide else "생성된 가이드 없음",
         "warnings": list(guide["warnings"]) if guide else [],
+        "alertSent": summary["alertSent"],
     }
     if guide:
         lines = guide["lines"]
         return dict(common, model="Amazon Bedrock · " + guide["model_id"],
-                    headline=lines[0], text=guide["text"], actions=lines[1:2])
+                    headline=lines[0], text=guide["text"], actions=lines[1:2],
+                    lines=list(lines))
     if result["status"] == "normal":
         headline = "선택한 날짜의 활동량에서 이상 감소가 감지되지 않았어요."
         text = "걸음 수 기준 판정이며, 다른 건강 지표의 정상 여부를 의미하지 않아요."
@@ -84,7 +91,8 @@ def anomalies_for_frontend(result):
         "severity": severity[item["severity"]],
         "title": titles.get(item["type"], "지표 이상 감지"),
         "time": result["date"],
-        # 걸음 수 단위는 AI/ML 가이드(4732493c)와 같은 "걸음"으로 통일한다.
+        # 걸음 수 단위는 AI/ML v0.4(origin/ai-ml @ 1956156a)와 같은 "걸음"으로 통일한다.
+        # (카드·차트·예시 데이터의 "보" 단위는 별도 범위)
         "desc": (f"기준일 걸음 수 {item['value']:,.0f}걸음 · "
                  f"과거 기록 평균 {item['baseline_mean']:,.0f}걸음")
                  if item["type"] == "ACTIVITY_DROP" else "AI/ML 지표 판정 결과입니다.",

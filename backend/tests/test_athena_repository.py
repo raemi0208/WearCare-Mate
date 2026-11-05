@@ -38,7 +38,10 @@ from src.health_service import build_health_data_response  # noqa: E402
 from src.mappers import map_fitbit_activity_rows  # noqa: E402
 
 USER_ID = "1000000001"
-COLUMNS = ["id", "activitydate", "totalsteps", "calories", "veryactiveminutes"]
+COLUMNS = [
+    "id", "activitydate", "totalsteps", "calories",
+    "veryactiveminutes", "fairlyactiveminutes", "lightlyactiveminutes", "sedentaryminutes",
+]
 SECRET = "secret-aws-detail-1234"
 
 
@@ -318,7 +321,10 @@ class BuildQueryTest(unittest.TestCase):
     def test_sql_shape(self):
         sql, _ = build_activity_query(make_config(max_rows=50), USER_ID)
         self.assertTrue(
-            sql.startswith("SELECT id, activitydate, totalsteps, calories, veryactiveminutes\n")
+            sql.startswith(
+                "SELECT id, activitydate, totalsteps, calories, "
+                "veryactiveminutes, fairlyactiveminutes, lightlyactiveminutes, sedentaryminutes\n"
+            )
         )
         self.assertIn('FROM "test_db"."test_table"', sql)
         self.assertIn("ORDER BY activitydate", sql)
@@ -439,9 +445,11 @@ class ResultReadingTest(unittest.TestCase):
             data_row(USER_ID, "2099-01-01", "1234", "1000", "5"),
         ])])
         rows = make_repository(client).fetch_activity_rows(USER_ID)
+        # 값이 5개뿐인 짧은 행은 나머지 컬럼(fairly/lightly/sedentary)이 None 으로 채워진다.
         self.assertEqual(rows, [{
             "id": USER_ID, "activitydate": "2099-01-01", "totalsteps": "1234",
             "calories": "1000", "veryactiveminutes": "5",
+            "fairlyactiveminutes": None, "lightlyactiveminutes": None, "sedentaryminutes": None,
         }])
 
     def test_null_values_become_none(self):

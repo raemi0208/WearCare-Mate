@@ -29,6 +29,40 @@ VIRTUAL_REQUEST = {
     "history_steps": [10000, 10500, 9800, 10200, 10100, 9900],
 }
 
+# ---------------------------------------------------------------------------
+# 기록 시간(tracked_minutes) 경계 검증용 가상 입력 (AI/ML v0.4)
+# ---------------------------------------------------------------------------
+# 사용자·날짜·걸음 수·과거 기록은 VIRTUAL_REQUEST 와 동일하게 두고 metrics.tracked_minutes 만 바꾼다.
+# 800 분 미만이면 걸음 수 판정을 건너뛴다는 규칙은 AI/ML 쪽 책임이다. 백엔드는 값을 그대로 전달한다.
+#   - 799 분: 기록 시간 기준 미달 → 걸음 수(ACTIVITY_DROP) 판정을 건너뛰는 것이 기대 결과.
+#   - 800 분: 기준 통과 → 걸음 수 판정 대상이 되는 것이 기대 결과.
+#     (가이드 생성·SNS 발송은 경계 테스트의 필수 통과 조건이 아니다.)
+# ⚠️ 실제 "판정 제외 시 응답 형식"과 alert_sent 위치는 담당자 v0.4 명세·실제 응답으로 확정해야 한다.
+TRACKED_MINUTES_BELOW = 799
+TRACKED_MINUTES_AT = 800
+
+TRACKED_MINUTES_CASES = (
+    {
+        "name": "below_threshold_799",
+        "trackedMinutes": TRACKED_MINUTES_BELOW,
+        "expectation": "stepJudgmentSkipped",  # 걸음 수 판정 건너뜀 (기대)
+        "note": "기록 시간 799분(<800)이라 걸음 수 판정을 건너뛰는 것이 기대 결과. 판정 제외 응답 형식은 v0.4 확정 필요.",
+    },
+    {
+        "name": "at_threshold_800",
+        "trackedMinutes": TRACKED_MINUTES_AT,
+        "expectation": "stepJudged",  # 걸음 수 판정 대상 (기대). 가이드/SNS 는 필수 아님
+        "note": "기록 시간 800분(=기준)이라 걸음 수 판정 대상이 되는 것이 기대 결과. 가이드 생성·SNS 발송은 필수 통과 조건 아님.",
+    },
+)
+
+
+def build_tracked_minutes_request(tracked_minutes):
+    """VIRTUAL_REQUEST 와 user_id·date·steps·history_steps 는 같고 metrics.tracked_minutes 만 더한 요청."""
+    request = dict(VIRTUAL_REQUEST)
+    request["metrics"] = dict(VIRTUAL_REQUEST["metrics"], tracked_minutes=tracked_minutes)
+    return request
+
 
 def _is_api_gateway_event(event):
     return isinstance(event, dict) and any(
@@ -109,6 +143,72 @@ def run_check(lambda_client_factory=create_lambda_client, environ=None):
         },
         screen={"aiGuide": screen_guide, "anomalies": screen_anomalies},
     ))
+
+
+BOUNDARY_TEST_NAME = "tracked-minutes-boundary-check"
+
+
+def _boundary_base(**fields):
+    body = {
+        "test": BOUNDARY_TEST_NAME,
+        "inputKind": INPUT_KIND,
+        "note": ("기록 시간(tracked_minutes) 경계 검증입니다. 800분 미만 걸음 수 판정 제외는 AI/ML 규칙이며, "
+                 "백엔드는 799/800 값을 그대로 전달만 합니다. 판정 제외 시 응답 형식과 alert_sent 위치는 "
+                 "담당자 v0.4 명세·실제 응답으로 확정해야 합니다."),
+    }
+    body.update(fields)
+    return body
+
+
+def _observe_case(case, client):
+    """경계 입력 1건을 보내고, 걸음 수 판정 여부를 관찰해 기록한다. (가이드/SNS 를 통과 조건으로 삼지 않음)"""
+    request = build_tracked_minutes_request(case["trackedMinutes"])
+    observed = {
+        "name": case["name"],
+        "trackedMinutes": case["trackedMinutes"],
+        "expectation": case["expectation"],
+        "request": request,
+        "note": case["note"],
+    }
+    try:
+        result = client.invoke_detection(dict(request))
+    except Exception as error:  # noqa: BLE001 - 호출·검증 실패는 관찰 실패로 기록 (대체 응답 없음)
+        observed.update(invoked=True, observeError=type(error).__name__)
+        if isinstance(error, MLErrorResponse):
+            observed.update(mlStatusCode=error.status_code, mlErrorCode=error.error_code)
+        return observed
+
+    summary = summarize_detection(result)
+    step_judged = any(a["type"] == STEP_ANOMALY_TYPE for a in result["anomalies"])
+    # 기대: 799 → 건너뜀(판정 안 함), 800 → 판정 대상(이 가상 입력은 급감이라 ACTIVITY_DROP 기대)
+    expected_step_judged = case["expectation"] == "stepJudged"
+    observed.update(
+        invoked=True,
+        mlStatus=result["status"],
+        overallSeverity=result["overall_severity"],
+        stepAnomalyJudged=step_judged,
+        guideState=summary["guideState"],
+        # 관찰값이 기대와 맞는지. 실제 v0.4 응답을 받기 전까지는 참고용 비교다.
+        matchesExpectation=(step_judged == expected_step_judged),
+    )
+    return observed
+
+
+def run_tracked_minutes_boundary_check(lambda_client_factory=create_lambda_client, environ=None):
+    """799/800 두 입력을 보내 걸음 수 판정 경계를 관찰한다. (실제 판정은 AI/ML 책임)
+
+    가이드 생성·SNS 발송을 통과 조건으로 삼지 않는다. 걸음 수 판정 여부만 관찰해 기대와 비교한다.
+    실제 v0.4 응답을 받기 전에는 로컬 관찰 결과로만 본다.
+    """
+    try:
+        config = MLConfig.from_env(environ)
+        client = MLClient(lambda_client_factory(config), config)
+    except Exception as error:  # noqa: BLE001
+        return dict(statusCode=500, **_boundary_base(
+            stage="config", errorType=type(error).__name__, mlInvoked=False))
+
+    cases = [_observe_case(case, client) for case in TRACKED_MINUTES_CASES]
+    return dict(statusCode=200, **_boundary_base(mlInvoked=True, cases=cases))
 
 
 def lambda_handler(event, context):

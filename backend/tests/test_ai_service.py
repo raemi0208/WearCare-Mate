@@ -95,6 +95,57 @@ class AIServiceTest(unittest.TestCase):
         result["guide"]["warnings"] = ["줄 수 2"]
         self.assertEqual(ai_service.guide_for_frontend(result)["warnings"], ["줄 수 2"])
 
+    def test_guide_lines_are_preserved_for_frontend(self):
+        """guide.lines 배열을 화면용 응답에 lines 로 그대로 전달한다(줄별 표시용)."""
+        result = result_for()
+        guide = ai_service.guide_for_frontend(result)
+        self.assertEqual(guide["lines"], result["guide"]["lines"])
+        # text 도 유지한다.
+        self.assertEqual(guide["text"], result["guide"]["text"])
+
+    def test_alert_sent_is_passed_through(self):
+        """응답 최상위 alert_sent true/false/필드 없음을 각각 True/False/None 으로 전달한다."""
+        true_result = result_for()
+        true_result["alert_sent"] = True
+        self.assertIs(ai_service.guide_for_frontend(true_result)["alertSent"], True)
+
+        false_result = result_for()
+        false_result["alert_sent"] = False
+        self.assertIs(ai_service.guide_for_frontend(false_result)["alertSent"], False)
+
+        no_field = result_for()  # 샘플에는 최상위 alert_sent 없음
+        self.assertIsNone(ai_service.guide_for_frontend(no_field)["alertSent"])
+
+    def test_alert_sent_preserved_when_guide_null(self):
+        """guide 가 null 이어도 최상위 alert_sent 가 화면용 alertSent 로 보존된다."""
+        missing = result_for()
+        missing["guide"] = None
+        missing["alert_sent"] = True
+        guide = ai_service.guide_for_frontend(missing)
+        self.assertEqual(guide["status"], "missing")
+        self.assertIs(guide["alertSent"], True)
+
+        normal = result_for("normal")
+        normal["alert_sent"] = False
+        self.assertIs(ai_service.guide_for_frontend(normal)["alertSent"], False)
+
+    def test_tracked_minutes_sent_when_items_have_minutes(self):
+        """활동 시간 네 값이 모두 있는 기준일이면 요청 metrics 에 tracked_minutes 를 담는다."""
+        items = [
+            {"date": "2016-04-09", "activity": {"totalSteps": 10000}},
+            {"date": "2016-04-10", "activity": {
+                "totalSteps": 2100, "veryActiveMinutes": 10, "fairlyActiveMinutes": 10,
+                "lightlyActiveMinutes": 100, "sedentaryMinutes": 679, "trackedMinutes": 799,
+            }},
+        ]
+        client = FakeLambda(result_for())
+        with patch.dict(os.environ, ENV, clear=True), \
+             patch.object(ai_service, "fetch_dashboard_activity_items", return_value=copy.deepcopy(items)), \
+             patch.object(ai_service, "create_lambda_client", return_value=client):
+            ai_service.build_ai_guide()
+        self.assertEqual(client.requests[0]["metrics"],
+                         {"steps": 2100, "tracked_minutes": 799})
+
     def test_guard_blocks_aws_before_incomplete_or_disabled_setup(self):
         for changes in ({"ENABLE_REAL_DATA_TESTING": "false"}, {"DATA_SOURCE": "mock"},
                         {"ML_TARGET_DATE": ""}, {"ML_TARGET_DATE": "2016-04-12"},

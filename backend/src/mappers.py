@@ -15,8 +15,11 @@
 설계 원칙 (미확정 사항을 임의로 확정하지 않음):
     - TotalDistance 는 단위(km/mile)가 확정되지 않았으므로 매핑하지 않습니다.
       기존 API 필드명 totalDistanceKm 에 넣으면 "km 단위"라고 확정하는 셈이기 때문입니다.
-    - VeryActiveMinutes 는 값이 실제로 제공된 경우에만 결과에 포함합니다.
-      (현재 Timestream 적재 스크립트는 이 컬럼을 적재하지 않음)
+    - 활동 시간(VeryActive/FairlyActive/LightlyActive/SedentaryMinutes)은 값이 실제로 제공된
+      컬럼만 결과에 포함합니다. (없는 값을 0 으로 채우지 않음)
+    - trackedMinutes(네 활동 시간의 합)는 네 컬럼이 모두 유효한 정수일 때만 포함합니다.
+      하나라도 없거나 잘못된 값이면 넣지 않습니다. (AI/ML v0.4 의 metrics.tracked_minutes 근거값)
+      800 분 미만 제외 같은 판정 규칙은 AI/ML 쪽 책임이며, 백엔드는 합계만 전달합니다.
     - 다른 데이터셋(수면 등)과 사용자 ID가 같다고 가정하지 않습니다.
 """
 
@@ -26,6 +29,15 @@ from datetime import date, datetime
 # - "%m/%d/%Y": Fitbit CSV 원본 형식 (예: 3/25/2016)
 # - "%Y-%m-%d": ISO 형식 / Athena date 타입 문자열 (예: 2016-03-25)
 _DATE_FORMATS = ("%m/%d/%Y", "%Y-%m-%d")
+
+# 활동 시간 컬럼 (정규화 키 → activity 출력 키). 값이 제공된 컬럼만 결과에 넣는다.
+# trackedMinutes(합계)는 네 컬럼이 모두 유효할 때만 만든다. (AI/ML v0.4 metrics.tracked_minutes 근거)
+_ACTIVE_MINUTE_FIELDS = (
+    ("veryactiveminutes", "veryActiveMinutes"),
+    ("fairlyactiveminutes", "fairlyActiveMinutes"),
+    ("lightlyactiveminutes", "lightlyActiveMinutes"),
+    ("sedentaryminutes", "sedentaryMinutes"),
+)
 
 
 def _normalize_key(key):
@@ -134,9 +146,13 @@ def map_fitbit_activity_row(row):
     매핑 규칙:
         Id                → userId               (문자열, 필수)
         ActivityDate      → date                 (ISO YYYY-MM-DD, 변환 불가 시 None)
-        TotalSteps        → activity.totalSteps  (정수, 없으면 None)
-        Calories          → activity.calories    (정수, 없으면 None)
-        VeryActiveMinutes → activity.veryActiveMinutes (값이 있을 때만 포함)
+        TotalSteps          → activity.totalSteps  (정수, 없으면 None)
+        Calories            → activity.calories    (정수, 없으면 None)
+        VeryActiveMinutes   → activity.veryActiveMinutes   (값이 있을 때만 포함)
+        FairlyActiveMinutes → activity.fairlyActiveMinutes (값이 있을 때만 포함)
+        LightlyActiveMinutes→ activity.lightlyActiveMinutes(값이 있을 때만 포함)
+        SedentaryMinutes    → activity.sedentaryMinutes    (값이 있을 때만 포함)
+        위 네 값이 모두 유효하면 → activity.trackedMinutes (네 값의 합)
 
     매핑하지 않는 컬럼:
         TotalDistance (단위 미확정), 그 외 Fitbit 컬럼, 수면 관련 컬럼
@@ -158,10 +174,16 @@ def map_fitbit_activity_row(row):
         "calories": _to_int(normalized.get("calories")),
     }
 
-    # VeryActiveMinutes 는 실제 값이 제공된 경우에만 포함한다.
-    very_active_minutes = _to_int(normalized.get("veryactiveminutes"))
-    if very_active_minutes is not None:
-        activity["veryActiveMinutes"] = very_active_minutes
+    # 활동 시간은 실제 값이 제공된 컬럼만 포함한다. (없는 값을 0 으로 채우지 않음)
+    # 네 값이 모두 유효하면 trackedMinutes(합계)를 만든다. 하나라도 없거나 잘못되면 만들지 않는다.
+    minutes = {}
+    for source_key, output_key in _ACTIVE_MINUTE_FIELDS:
+        value = _to_int(normalized.get(source_key))
+        if value is not None:
+            activity[output_key] = value
+            minutes[output_key] = value
+    if len(minutes) == len(_ACTIVE_MINUTE_FIELDS):
+        activity["trackedMinutes"] = sum(minutes.values())
 
     return {
         "userId": _to_user_id(normalized.get("id")),

@@ -1,9 +1,21 @@
 """WearCare Mate 백엔드 - AI/ML(이상 탐지) 요청 생성과 응답 검증 (순수 함수).
 
-기준 자료 (읽기 전용 확인, origin/ai-ml @ 3dc9a94):
-    - docs/ml-interface-spec.md v0.3 (2026-10-30, 초안·팀 확인 필요)
+기준 자료 (읽기 전용 확인, origin/ai-ml @ 1956156a, 2026-11-03):
+    - docs/ml-interface-spec.md v0.4 (GitHub origin/ai-ml, 다운로드본과 내용 동일 확인)
     - AI_ML/lambda_handler.py, AI_ML/detector.py
     - docs/sample_responses.json
+
+AI/ML v0.4 반영 (명세 v0.4 기준):
+    - 요청 metrics 에 tracked_minutes(기준일 활동 시간 네 값의 합)를 선택 전달. 네 값이 모두
+      유효할 때만 보내고, 누락·오류면 생략한다(0 으로 채우지 않음).
+      800 분 미만이면 AI/ML 이 "걸음 수 판정"만 건너뛴다(detector.personal_check → insufficient_data).
+      다른 지표(수면·HRV·스트레스)는 그대로 판정한다. 백엔드는 합계만 전달한다.
+    - 응답 guide 의 lines 배열을 그대로 보존한다.
+    - alert_sent 는 **응답 최상위** 선택 필드다(명세 7번, 핸들러 out["alert_sent"]=send_alert(out)).
+      guide 와 형제이며, guide 가 null 이어도(이상 아님·생성 실패) true/false 가 올 수 있다.
+      true/false/필드 없음을 구분한다. SNS 발송은 AI/ML(wearcare-mate-ml)이 담당한다(주제 wearcare-mate-alert).
+    ⚠️ 커밋된 sample_responses.json 에는 아직 alert_sent 가 없어, 검증에서는 최상위 선택 필드로 둔다.
+       실제 응답은 항상 alert_sent 를 포함한다.
 
 현재 범위:
     - API(/dashboard, /ai-guide)는 ai_service.py를 통해 이 모듈을 사용한다.
@@ -133,6 +145,46 @@ def daily_steps_for_user(mapped_rows, user_id):
     return collect_daily_steps(build_activity_items(mapped_rows, user_id))
 
 
+def _valid_minutes(value):
+    """활동 시간으로 쓸 수 있는 0 이상의 정수면 그 값, 아니면 None. (유효한 0 은 그대로 둔다)"""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def collect_daily_tracked_minutes(items):
+    """items 에서 날짜별 기록 시간 합계(tracked_minutes)를 만든다. (AI/ML v0.4 metrics.tracked_minutes)
+
+    activity.trackedMinutes 는 mappers 가 네 활동 시간(very/fairly/lightly/sedentary)이 모두
+    유효할 때만 넣는 값이다. 하나라도 누락·오류면 그 날짜는 결과에 넣지 않는다. (0 으로 채우지 않음)
+
+    - 유효한 0 은 그대로 쓴다. (활동 시간 0 분도 유효한 값)
+    - 같은 날짜에 서로 다른 trackedMinutes 가 있으면 어느 값이 맞는지 알 수 없으므로 그 날짜를 제외한다.
+      (collect_daily_steps 와 같은 정책)
+
+    Returns:
+        dict[date, int]: 네 활동 시간이 모두 유효한 날짜 → 합계.
+
+    Raises:
+        ValueError: items 가 list/tuple 이 아니거나 항목이 dict 가 아닐 때.
+    """
+    if not isinstance(items, (list, tuple)):
+        raise ValueError("activity items 는 list 형식이어야 합니다.")
+
+    values_by_date = {}
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError("activity item 은 dict 형식이어야 합니다.")
+        day = _parse_iso_date(item.get("date"))
+        activity = item.get("activity")
+        minutes = _valid_minutes(activity.get("trackedMinutes")) if isinstance(activity, dict) else None
+        if day is None or minutes is None:
+            continue
+        values_by_date.setdefault(day, set()).add(minutes)
+
+    return {day: next(iter(values)) for day, values in values_by_date.items() if len(values) == 1}
+
+
 def build_history_steps(daily_steps, target_date):
     """기준일 직전 걸음 수 기록(history_steps)을 만든다.
 
@@ -163,7 +215,8 @@ def build_history_steps(daily_steps, target_date):
     return [steps for _day, steps in history[-HISTORY_MAX_RECORDS:]]
 
 
-def build_detection_request(user_id, target_date, daily_steps, excluded_dates=()):
+def build_detection_request(user_id, target_date, daily_steps, excluded_dates=(),
+                            daily_tracked_minutes=None):
     """AI/ML Lambda 요청 JSON 을 만든다. (걸음 수 기반 개인 기준선만, history_steps 미포함)
 
     과거 기록(history)은 AI/ML Lambda 가 Athena 에서 직접 읽는다(담당자 요청).
@@ -176,9 +229,14 @@ def build_detection_request(user_id, target_date, daily_steps, excluded_dates=()
         daily_steps (dict[date, int]): 그 사용자의 날짜별 걸음 수. 기준일 걸음 수를 꺼내는 데만 쓴다.
         excluded_dates (Iterable[date | str]): 기준일로 쓰지 않을 날짜. 기본값은 비어 있다.
             ⚠️ 2016-04-12 같은 불완전한 날의 제외 정책은 미확정이므로 기본값에 넣지 않았다.
+        daily_tracked_minutes (dict[date, int] | None): 날짜별 기록 시간 합계
+            (collect_daily_tracked_minutes 결과). AI/ML v0.4 의 metrics.tracked_minutes 근거값이다.
+            기준일 값이 있으면 metrics.tracked_minutes 로 전달하고, 없으면 생략한다.
+            (네 활동 시간 중 하나라도 누락·오류면 그 날짜는 여기에 들어 있지 않으므로 자동으로 생략된다.
+            누락값을 0 으로 채우지 않는다. 800 분 미만 판정 제외는 AI/ML 쪽 규칙이므로 백엔드는 합계만 보낸다.)
 
     Returns:
-        dict: {"user_id", "date", "metrics": {"steps"}}
+        dict: {"user_id", "date", "metrics": {"steps"[, "tracked_minutes"]}}
 
     Raises:
         MLRequestError: 사용자 ID·날짜·입력 형식 오류
@@ -190,6 +248,8 @@ def build_detection_request(user_id, target_date, daily_steps, excluded_dates=()
 
     if not isinstance(daily_steps, dict):
         raise MLRequestError("daily_steps 는 날짜별 걸음 수 dict 여야 합니다.")
+    if daily_tracked_minutes is not None and not isinstance(daily_tracked_minutes, dict):
+        raise MLRequestError("daily_tracked_minutes 는 날짜별 기록 시간 dict 여야 합니다.")
     if target in excluded:
         raise TargetNotEligibleError("excluded_date")
 
@@ -202,11 +262,20 @@ def build_detection_request(user_id, target_date, daily_steps, excluded_dates=()
         # v0.3 코드는 기준일 0걸음을 제외하지 않는다 → 정책 확정 전까지 요청을 만들지 않는다.
         raise TargetNotEligibleError("zero_steps")
 
+    metrics = {"steps": steps}
+    if daily_tracked_minutes is not None:
+        tracked = daily_tracked_minutes.get(target)
+        if tracked is not None:
+            # collect_daily_tracked_minutes 가 이미 네 값이 모두 유효할 때만 넣으므로 0 이상의 정수다.
+            if isinstance(tracked, bool) or not isinstance(tracked, int) or tracked < 0:
+                raise MLRequestError("기준일 기록 시간은 0 이상의 정수여야 합니다.")
+            metrics["tracked_minutes"] = tracked
+
     # history_steps 는 넣지 않는다. (AI/ML Lambda 가 Athena 에서 직접 조회)
     return {
         "user_id": user_id,
         "date": target.isoformat(),
-        "metrics": {"steps": steps},
+        "metrics": metrics,
     }
 
 
@@ -318,6 +387,11 @@ def validate_detection_result(body, expected_user_id=None, expected_date=None):
         _fail("anomaly_score 는 숫자 또는 null 이어야 합니다.")
     if not isinstance(body["model_version"], str) or not body["model_version"]:
         _fail("model_version 이 올바르지 않습니다.")
+    # alert_sent 는 응답 최상위의 선택 필드(v0.4 명세 7번, origin/ai-ml @ 1956156a). guide 와 형제다.
+    # 실제 AI/ML 핸들러는 항상 넣지만(true/false), 커밋된 sample_responses.json 에는 아직 없어 선택으로 둔다.
+    # 있으면 불리언이어야 하며, guide 가 null 이어도(status=anomaly 가 아니어도) 올 수 있다.
+    if "alert_sent" in body and not isinstance(body["alert_sent"], bool):
+        _fail("alert_sent 는 불리언이어야 합니다.")
 
     if status == "anomaly":
         if not anomalies:
@@ -350,8 +424,13 @@ def summarize_detection(result):
             "stepAnomaly": bool,          # ACTIVITY_DROP(걸음 수) 이상 여부
             "guideState": "generated" | "missing" | "not_applicable",
             "guideWarningCount": int,     # 프론트 표시는 가능, 로그 수집용 (명세 8번)
+            "alertSent": True | False | None,  # 응답 최상위 alert_sent (v0.4, 선택). 필드 없으면 None
         }
         guideState 로 "이상이 없어 가이드가 없음"과 "이상이 있는데 가이드가 없음(생성 실패 등)"을 구분한다.
+        alertSent 는 AI/ML(wearcare-mate-ml)이 SNS 를 발송했는지 알려 주는 응답 최상위 선택 필드다.
+        True(발송함) / False(발송 안 함) / None(필드 없음 = 알 수 없음)을 구분한다.
+        guide 가 null(이상 아님·생성 실패)이어도 발송 결과는 보존한다.
+        백엔드는 SNS 를 직접 발송하지 않으며, 이 값은 표시·로그용으로만 전달한다.
     """
     status = result["status"]
     guide = result["guide"]
@@ -371,6 +450,9 @@ def summarize_detection(result):
         ),
         "guideState": guide_state,
         "guideWarningCount": len(guide["warnings"]) if guide else 0,
+        # 응답 최상위 alert_sent 를 읽는다(v0.4). guide 유무와 무관하게 true/false 를 보존하고,
+        # 필드가 없으면 None. (기존 프론트엔드용 alertSent 계약: True/False/None)
+        "alertSent": result.get("alert_sent"),
     }
 
 

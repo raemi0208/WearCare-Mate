@@ -5,7 +5,8 @@ mappers.map_fitbit_activity_rows() 에 그대로 넘길 수 있는 "문자열 di
 
     rows = repository.fetch_activity_rows("1000000001", "2099-01-01", "2099-01-31")
     # [{"id": "1000000001", "activitydate": "2099-01-01", "totalsteps": "1234",
-    #   "calories": "1000", "veryactiveminutes": None}, ...]
+    #   "calories": "1000", "veryactiveminutes": None, "fairlyactiveminutes": None,
+    #   "lightlyactiveminutes": None, "sedentaryminutes": None}, ...]
 
 ⚠️ 현재 상태:
     - 이 모듈은 아직 API(data_source.py)에 연결되어 있지 않습니다.
@@ -63,7 +64,11 @@ ENV_QUERY_TIMEOUT = "ATHENA_QUERY_TIMEOUT_SECONDS"
 ENV_MAX_ROWS = "ATHENA_MAX_ROWS"
 
 # 조회할 컬럼 (Athena 테이블의 실제 컬럼명, 모두 string 타입)
-ACTIVITY_COLUMNS = ("id", "activitydate", "totalsteps", "calories", "veryactiveminutes")
+# 활동 시간 네 컬럼(very/fairly/lightly/sedentary)은 AI/ML v0.4 의 tracked_minutes 합산 근거값이다.
+ACTIVITY_COLUMNS = (
+    "id", "activitydate", "totalsteps", "calories",
+    "veryactiveminutes", "fairlyactiveminutes", "lightlyactiveminutes", "sedentaryminutes",
+)
 
 # GetQueryResults 한 번에 받을 수 있는 최대 행 수 (Athena API 제한)
 _RESULTS_PAGE_LIMIT = 1000

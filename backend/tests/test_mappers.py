@@ -39,7 +39,11 @@ class FitbitRowNormalMappingTest(unittest.TestCase):
     """정상 데이터 매핑."""
 
     def test_csv_row_is_mapped(self):
-        """CSV 형식 행이 userId/date/activity 구조로 변환되어야 한다."""
+        """CSV 형식 행이 userId/date/activity 구조로 변환되어야 한다.
+
+        기본 make_csv_row 에는 VeryActive/SedentaryMinutes 만 있고 Fairly/Lightly 가 없으므로
+        제공된 활동 시간만 포함되고 trackedMinutes 는 만들어지지 않는다.
+        """
         result = map_fitbit_activity_row(make_csv_row())
         self.assertEqual(
             result,
@@ -50,9 +54,11 @@ class FitbitRowNormalMappingTest(unittest.TestCase):
                     "totalSteps": 1234,
                     "calories": 1000,
                     "veryActiveMinutes": 5,
+                    "sedentaryMinutes": 700,
                 },
             },
         )
+        self.assertNotIn("trackedMinutes", result["activity"])
 
     def test_user_id_is_string(self):
         """사용자 ID 는 항상 문자열이어야 한다."""
@@ -86,10 +92,63 @@ class FitbitRowNormalMappingTest(unittest.TestCase):
         self.assertNotIn("totalDistanceKm", result["activity"])
 
     def test_unmapped_columns_are_excluded(self):
-        """매핑 대상이 아닌 컬럼(SedentaryMinutes 등)은 결과에 들어가지 않아야 한다."""
+        """매핑 대상이 아닌 컬럼(TotalDistance 등)은 결과에 들어가지 않아야 한다."""
         result = map_fitbit_activity_row(make_csv_row())
         self.assertEqual(set(result.keys()), {"userId", "date", "activity"})
-        self.assertNotIn("sedentaryMinutes", result["activity"])
+        self.assertNotIn("totalDistance", result["activity"])
+
+
+class FitbitTrackedMinutesTest(unittest.TestCase):
+    """AI/ML v0.4 tracked_minutes 근거값: 활동 시간 네 컬럼 매핑과 합계(trackedMinutes)."""
+
+    def all_four(self, **overrides):
+        """활동 시간 네 컬럼을 모두 담은 가상 행."""
+        row = make_csv_row(
+            VeryActiveMinutes="20", FairlyActiveMinutes="30",
+            LightlyActiveMinutes="200", SedentaryMinutes="600",
+        )
+        row.update(overrides)
+        return row
+
+    def test_all_four_minutes_are_mapped_and_summed(self):
+        """네 활동 시간이 모두 있으면 각 값과 trackedMinutes(합계)를 포함해야 한다."""
+        activity = map_fitbit_activity_row(self.all_four())["activity"]
+        self.assertEqual(activity["veryActiveMinutes"], 20)
+        self.assertEqual(activity["fairlyActiveMinutes"], 30)
+        self.assertEqual(activity["lightlyActiveMinutes"], 200)
+        self.assertEqual(activity["sedentaryMinutes"], 600)
+        self.assertEqual(activity["trackedMinutes"], 850)
+
+    def test_valid_zero_is_summed(self):
+        """유효한 0 분은 합계에 포함한다(0 으로 채우는 것과 다름)."""
+        activity = map_fitbit_activity_row(self.all_four(VeryActiveMinutes="0"))["activity"]
+        self.assertEqual(activity["veryActiveMinutes"], 0)
+        self.assertEqual(activity["trackedMinutes"], 830)
+
+    def test_one_missing_minute_omits_tracked_minutes(self):
+        """네 값 중 하나라도 없으면 trackedMinutes 를 만들지 않는다. 있는 값은 그대로 둔다."""
+        row = self.all_four()
+        del row["FairlyActiveMinutes"]
+        activity = map_fitbit_activity_row(row)["activity"]
+        self.assertNotIn("trackedMinutes", activity)
+        self.assertNotIn("fairlyActiveMinutes", activity)
+        self.assertEqual(activity["veryActiveMinutes"], 20)
+
+    def test_one_invalid_minute_omits_tracked_minutes(self):
+        """네 값 중 하나라도 잘못되면(소수·문자) trackedMinutes 를 만들지 않는다."""
+        activity = map_fitbit_activity_row(self.all_four(LightlyActiveMinutes="12.5"))["activity"]
+        self.assertNotIn("trackedMinutes", activity)
+        self.assertNotIn("lightlyActiveMinutes", activity)
+
+    def test_athena_lowercase_minute_columns(self):
+        """Athena 소문자 컬럼명으로도 네 값과 합계가 만들어져야 한다."""
+        row = {
+            "id": "1000000001", "activitydate": "2099-01-02", "totalsteps": "1234",
+            "veryactiveminutes": "10", "fairlyactiveminutes": "10",
+            "lightlyactiveminutes": "100", "sedentaryminutes": "679",
+        }
+        activity = map_fitbit_activity_row(row)["activity"]
+        self.assertEqual(activity["trackedMinutes"], 799)
 
     def test_input_row_is_not_modified(self):
         """매핑 함수는 입력 행을 변경하지 않아야 한다(순수 함수)."""
@@ -109,6 +168,7 @@ class FitbitColumnNameTest(unittest.TestCase):
             "activitydate": "2099-01-02",
             "totalsteps": "1234",
             "veryactiveminutes": "5",
+            "sedentaryminutes": "700",
             "calories": "1000",
         }
         self.assertEqual(

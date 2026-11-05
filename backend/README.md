@@ -86,12 +86,16 @@ Bedrock 모델과 AI/ML 환경변수는 AI/ML 담당자가 관리합니다.
 
 - src/lambda_function.py: HTTP 라우팅과 고정 오류 응답. 서비스 핸들러는 src.lambda_function.lambda_handler.
 - src/athena_repository.py, real_health_data.py: 조회·대상 확인·매핑.
+  (활동 시간 네 컬럼 very/fairly/lightly/sedentary 를 함께 조회 — AI/ML v0.4 tracked_minutes 근거값)
 - src/dashboard_service.py, dashboard_data.py: 주간 통계와 실제 대시보드.
 - src/ml_adapter.py, ml_client.py: 요청 생성, Lambda 호출, 응답 검증.
+  (v0.4: 요청 metrics.tracked_minutes 선택 전달, 응답 guide.lines 보존·응답 최상위 alert_sent 선택 처리)
 - src/ai_service.py: REAL API 조립과 화면용 변환.
 - src/ml_integration_check.py: 고정 공개 데이터 ID/날짜의 콘솔 전용 검증 핸들러. API Gateway나 Function URL에 연결하지 마세요.
 - src/ml_virtual_anomaly_check.py: 고정 가상 입력의 콘솔 전용 이상 경로 검증 핸들러(Athena 미사용, Bedrock 비용 발생 가능).
   API Gateway 이벤트는 거절합니다. API Gateway나 Function URL에 연결하지 마세요.
+  v0.4 기록 시간 경계 관찰용 run_tracked_minutes_boundary_check 도 포함합니다(tracked_minutes 799/800,
+  걸음 수 판정 여부만 관찰, 가이드·SNS 는 통과 조건 아님).
 
 ## 로컬 검증
 
@@ -101,6 +105,6 @@ backend 폴더에서 Python 3.13으로 실행합니다.
 python -m unittest discover -s tests
 ```
 
-377개 테스트가 가짜 AWS 클라이언트/패치된 연결로 실행됩니다(2026-11-02 로컬 실행 기준). 실제 AWS에는 접속하지 않습니다.
+410개 테스트가 가짜 AWS 클라이언트/패치된 연결로 실행됩니다(2026-11-03 로컬 실행 기준). 실제 AWS에는 접속하지 않습니다.
 MOCK 경로와 테스트는 표준 라이브러리로 실행하며 실제 AWS 경로는 boto3/botocore가 필요합니다.
 현재 Lambda 런타임 포함 SDK를 사용한 배포를 검증했습니다. SDK 버전 고정은 별도 작업입니다.

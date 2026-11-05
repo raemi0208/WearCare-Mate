@@ -23,6 +23,7 @@ from src.ml_adapter import (  # noqa: E402
     TargetNotEligibleError,
     build_detection_request,
     build_history_steps,
+    collect_daily_tracked_minutes,
     daily_steps_for_user,
     step_anomaly_dates,
     summarize_detection,
@@ -223,6 +224,97 @@ class BuildDetectionRequestTest(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# tracked_minutes (AI/ML v0.4)
+# ---------------------------------------------------------------------------
+def item_with_minutes(day, steps, very=None, fairly=None, lightly=None, sedentary=None):
+    """collect_daily_tracked_minutes 입력용 가상 활동 항목. (health_service items 형태)"""
+    activity = {"totalSteps": steps}
+    for key, value in (("veryActiveMinutes", very), ("fairlyActiveMinutes", fairly),
+                       ("lightlyActiveMinutes", lightly), ("sedentaryMinutes", sedentary)):
+        if value is not None:
+            activity[key] = value
+    if None not in (very, fairly, lightly, sedentary):
+        activity["trackedMinutes"] = very + fairly + lightly + sedentary
+    return {"date": day, "activity": activity}
+
+
+class CollectDailyTrackedMinutesTest(unittest.TestCase):
+
+    def test_sums_when_all_four_present(self):
+        items = [item_with_minutes("2016-04-10", 2100, 20, 30, 200, 600)]
+        self.assertEqual(collect_daily_tracked_minutes(items), {TARGET: 850})
+
+    def test_valid_zero_is_summed(self):
+        items = [item_with_minutes("2016-04-10", 2100, 0, 30, 200, 600)]
+        self.assertEqual(collect_daily_tracked_minutes(items), {TARGET: 830})
+
+    def test_missing_minute_excludes_date(self):
+        """네 값 중 하나라도 없으면(trackedMinutes 없음) 그 날짜는 결과에 없다."""
+        items = [item_with_minutes("2016-04-10", 2100, 20, 30, 200)]  # sedentary 없음
+        self.assertEqual(collect_daily_tracked_minutes(items), {})
+
+    def test_conflicting_values_exclude_date(self):
+        items = [
+            item_with_minutes("2016-04-10", 2100, 20, 30, 200, 600),  # 850
+            item_with_minutes("2016-04-10", 2100, 20, 30, 200, 700),  # 870
+        ]
+        self.assertEqual(collect_daily_tracked_minutes(items), {})
+
+    def test_invalid_items(self):
+        with self.assertRaises(ValueError):
+            collect_daily_tracked_minutes("not-a-list")
+        with self.assertRaises(ValueError):
+            collect_daily_tracked_minutes(["not-a-dict"])
+
+
+class BuildDetectionRequestTrackedMinutesTest(unittest.TestCase):
+
+    def test_tracked_minutes_added_when_available(self):
+        daily = {TARGET: 2100}
+        request = build_detection_request(USER_ID, TARGET, daily,
+                                          daily_tracked_minutes={TARGET: 850})
+        self.assertEqual(request["metrics"], {"steps": 2100, "tracked_minutes": 850})
+
+    def test_tracked_minutes_omitted_when_target_missing(self):
+        """기준일에 tracked_minutes 가 없으면 생략한다(0 으로 채우지 않음)."""
+        daily = {TARGET: 2100}
+        request = build_detection_request(USER_ID, TARGET, daily,
+                                          daily_tracked_minutes={date(2016, 4, 9): 850})
+        self.assertEqual(request["metrics"], {"steps": 2100})
+
+    def test_tracked_minutes_omitted_when_none(self):
+        request = build_detection_request(USER_ID, TARGET, {TARGET: 2100},
+                                          daily_tracked_minutes=None)
+        self.assertEqual(request["metrics"], {"steps": 2100})
+
+    def test_valid_zero_tracked_minutes_is_sent(self):
+        request = build_detection_request(USER_ID, TARGET, {TARGET: 2100},
+                                          daily_tracked_minutes={TARGET: 0})
+        self.assertEqual(request["metrics"], {"steps": 2100, "tracked_minutes": 0})
+
+    def test_799_and_800_are_passed_through_untouched(self):
+        """백엔드는 800 분 기준 판정을 하지 않는다. 799/800 모두 그대로 전달한다."""
+        for minutes in (799, 800):
+            request = build_detection_request(USER_ID, TARGET, {TARGET: 2100},
+                                              daily_tracked_minutes={TARGET: minutes})
+            self.assertEqual(request["metrics"]["tracked_minutes"], minutes)
+
+    def test_invalid_tracked_minutes_map_type(self):
+        with self.assertRaises(MLRequestError):
+            build_detection_request(USER_ID, TARGET, {TARGET: 2100},
+                                    daily_tracked_minutes=[("x", 1)])
+
+    def test_tracked_minutes_from_collector_end_to_end(self):
+        """mappers → collect_daily_tracked_minutes → build_detection_request 흐름."""
+        items = [item_with_minutes("2016-04-10", 2100, 10, 10, 100, 679)]  # 합계 799
+        request = build_detection_request(
+            USER_ID, TARGET, {TARGET: 2100},
+            daily_tracked_minutes=collect_daily_tracked_minutes(items),
+        )
+        self.assertEqual(request["metrics"], {"steps": 2100, "tracked_minutes": 799})
+
+
+# ---------------------------------------------------------------------------
 # 응답 검증 (v0.3)
 # ---------------------------------------------------------------------------
 class ValidateSamplesTest(unittest.TestCase):
@@ -315,6 +407,28 @@ class ValidateViolationsTest(unittest.TestCase):
         body["guide"]["warnings"] = ["줄 수 2"]
         validate_detection_result(body)
 
+    def test_optional_top_level_alert_sent_boolean_is_accepted(self):
+        """alert_sent(v0.4)는 응답 최상위 선택 필드. true/false 둘 다 유효하고, 없어도 유효하다."""
+        for value in (True, False):
+            body = self.anomaly_body()
+            body["alert_sent"] = value
+            validate_detection_result(body)
+        body = self.anomaly_body()
+        self.assertNotIn("alert_sent", body)  # 커밋된 샘플에는 최상위 필드 없음
+        validate_detection_result(body)
+
+    def test_top_level_alert_sent_allowed_when_guide_null(self):
+        """guide 가 없어도(이상 아님) 최상위 alert_sent 는 올 수 있다."""
+        body = sample("normal")["response"]
+        body["alert_sent"] = False
+        validate_detection_result(body)
+
+    def test_non_boolean_top_level_alert_sent_is_rejected(self):
+        for value in ("true", 1, None):
+            body = self.anomaly_body()
+            body["alert_sent"] = value
+            self.assert_invalid(body)
+
     def test_consistency_rules(self):
         body = self.anomaly_body()
         body["anomalies"] = []
@@ -372,7 +486,30 @@ class SummarizeDetectionTest(unittest.TestCase):
         self.assertEqual(summary, {
             "date": "2026-10-30", "status": "anomaly", "overallSeverity": "high",
             "stepAnomaly": True, "guideState": GUIDE_GENERATED, "guideWarningCount": 0,
+            "alertSent": None,
         })
+
+    def test_alert_sent_true_false_none_are_distinguished(self):
+        """최상위 alert_sent true/false/필드 없음을 각각 True/False/None 으로 구분한다."""
+        self.assertIsNone(self.summarize("activity_drop_high")["alertSent"])  # 필드 없음
+        true_summary = self.summarize(
+            "activity_drop_high", lambda b: b.update(alert_sent=True))
+        self.assertIs(true_summary["alertSent"], True)
+        false_summary = self.summarize(
+            "activity_drop_high", lambda b: b.update(alert_sent=False))
+        self.assertIs(false_summary["alertSent"], False)
+
+    def test_alert_sent_preserved_when_guide_null(self):
+        """guide 가 null(이상 아님·생성 실패)이어도 최상위 alert_sent 값이 보존된다."""
+        # 이상인데 guide 생성 실패 + 알림 발송됨
+        missing = self.summarize(
+            "activity_drop_high", lambda b: b.update(guide=None, alert_sent=True))
+        self.assertEqual(missing["guideState"], GUIDE_MISSING)
+        self.assertIs(missing["alertSent"], True)
+        # 정상(guide 없음) + 알림 미발송
+        normal = self.summarize("normal", lambda b: b.update(alert_sent=False))
+        self.assertEqual(normal["guideState"], GUIDE_NOT_APPLICABLE)
+        self.assertIs(normal["alertSent"], False)
 
     def test_anomaly_without_guide_is_distinguished(self):
         """이상이 있는데 guide=null 이면 'missing' (이상 없음의 'not_applicable' 과 구분)."""
