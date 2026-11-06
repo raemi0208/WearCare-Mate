@@ -132,6 +132,68 @@ Athena 실제 데이터, 공개 API 경로, 브라우저에서 실제 생성 가
 - `aiGuide.alertReason`: 발송/미발송 사유 문자열 또는 `null`. `guide`가 없어도 보존됩니다.
 - 세 필드 모두 표시·로그용이며 백엔드는 SNS 를 직접 발송하지 않습니다.
 
+## 비공개 wearcare-mate-athena-test 실데이터 경계 검증 (2026-11-06 · 실행 완료)
+
+실제 Athena 데이터로 날짜별 백엔드→AI/ML 경로를 검증하는 콘솔 전용 핸들러입니다. 아래 "실제 AWS
+검증 결과" 항목은 발표 PC 로컬 중계 경로(`wearcare-test` 프로필)로 실제 `wearcare-mate-athena-test`
+Lambda·Athena·AI/ML 을 호출해 얻은 결과입니다. 공개 API·Vercel 배포본은 변경하지 않았습니다.
+
+- 핸들러: `src.ml_integration_check.lambda_handler` (현재 런타임 서비스 핸들러 `src.lambda_function.lambda_handler`와 별개)
+- 테스트 이벤트(한 날짜씩, 각 실행 ML 1회):
+  ```json
+  { "target_date": "2016-04-10" }
+  ```
+  ```json
+  { "target_date": "2016-04-12" }
+  ```
+- 동작:
+  - 허용 날짜는 `2016-04-10`, `2016-04-12` 두 개뿐. 그 외 날짜·형식, API Gateway 이벤트는 **ML 호출 전에 거절**.
+  - 사용자는 기존 테스트 사용자(`get_allowed_user_id`, 보통 `DASHBOARD_USER_ID`)만.
+  - 기존 Athena 조회·매핑(`build_real_health_data`)과 변환(`collect_daily_steps`,
+    `collect_daily_tracked_minutes`, `build_detection_request`)을 재사용. 활동·비활동 4개 컬럼 합계를
+    `metrics.tracked_minutes`로, 요청 최상위에 `notify: false`를 넣음. **요청 값은 Athena 조회 값으로 구성**.
+  - 4월 12일 제외 범위: 일반 API(`ai_service._load_result`)는 04-12 를 **기준일 선택** 단계에서만 제외한다
+    (`excluded_dates=("2016-04-12",)`, `ML_TARGET_DATE=2016-04-12` 거부). 조회·과거 이력에는 적용되지 않음
+    (Athena 는 날짜 필터 없이 사용자 전체 행을 읽음). 이 콘솔 핸들러는 `excluded_dates`를 비워 **04-12 도
+    기준일로 조회**할 수 있게 하되, 일반 API 동작은 바꾸지 않음.
+- 기대 결과(요청 값은 실제 Athena 조회 값, 아래 숫자는 비교용):
+
+| 이벤트 | 요청 metrics | 기록 시간 기준 | ML 판정 | 근거 |
+|---|---|---|---|---|
+| 2016-04-10 | `{steps:10057, tracked_minutes:962}`, `notify:false` | 962 ≥ 800 | 걸음 수 판정 대상 (`normal`이어도 OK) | `trackedMinutesBelowThreshold=false` |
+| 2016-04-12 | `{steps:224, tracked_minutes:41}`, `notify:false` | 41 < 800 | 걸음 수(`ACTIVITY_DROP`) **판정 제외** | `stepJudgmentSkipped=true` (ACTIVITY_DROP 없음 + 기록 시간<800) |
+
+- 응답 확인 필드: `request.metrics.tracked_minutes`·`request.metrics.steps`(요청에 담긴 값),
+  `ml.status`, `ml.stepAnomalyDetected`/`ml.anomalyTypes`, `alertSent`, `alertReason`,
+  그리고 41분 케이스의 판정 제외 근거 `stepJudgmentSkipped`·`trackedMinutesBelowThreshold`.
+- 두 케이스 모두 `notify: false`라 `alert_sent=false` 기대. `alert_reason`은 ML 응답 원문을 그대로 기록.
+- 962분 케이스는 `normal`이어도 성공으로 봅니다(걸음 수 판정 자체는 수행됨).
+
+### 실제 AWS 검증 결과 (2026-11-06, `wearcare-test` 프로필 · ap-northeast-2)
+
+발표 PC 로컬 중계 서버를 통해 실제 `wearcare-mate-athena-test` Lambda(Athena + AI/ML)를 날짜별로
+각 1회 호출한 결과입니다. 요청 값은 Athena 조회 값으로 구성했고, 아래 값이 기대 비교값과 일치했습니다.
+
+| 이벤트 | 요청 metrics | 기록 시간 기준 | ML 판정 | SNS 발송 |
+|---|---|---|---|---|
+| 2016-04-10 | `{steps:10057, tracked_minutes:962}`, `notify:false` | 962 ≥ 800 | `normal` (걸음 수 판정 수행, 이상 없음) | `alertSent=false` (`notify:false`) |
+| 2016-04-12 | `{steps:224, tracked_minutes:41}`, `notify:false` | 41 < 800 | 걸음 수(`ACTIVITY_DROP`) **판정 제외** | `alertSent=false` (`notify:false`) |
+
+- 4월 10일: 기록 시간 962분으로 800분 기준을 넘겨 걸음 수 판정을 수행했고, 결과는 `normal`(이상 없음)입니다.
+- 4월 12일: 기록 시간 41분으로 800분 미만이라 걸음 수(`ACTIVITY_DROP`) 판정에서 제외됐습니다
+  (`stepJudgmentSkipped=true`, `trackedMinutesBelowThreshold=true`).
+- 두 요청 모두 최상위 `notify:false`라 SNS 미발송(`alertSent=false`)을 확인했습니다. `alertReason`은 ML 응답 원문을 그대로 기록합니다.
+
+### 검증 경로 구분 (로컬 브라우저 vs Vercel 배포)
+
+- **로컬 브라우저 검증 (완료)**: 발표 PC에서 로컬 중계 서버(`wearcare-test` 프로필)를 통해 공개 대시보드
+  프론트엔드를 실제 Athena 데이터에 연결해 확인했습니다. 주간 평균 `12,369보`, 기준주 4/10 시계열,
+  `/ai-guide` 정상 판정·`alertSent=false`를 브라우저에서 확인했습니다. 발표 시연은 이 로컬 중계 경로를 사용합니다.
+- **Vercel 배포 상태 (미연결, 변경 없음)**: 발표용 Vercel 배포본(`https://wearcare-mate-dxqh.vercel.app`)은
+  빌드에 `REACT_APP_API_BASE`가 없어 **목(mock) 데이터 모드**로 동작합니다. HTTPS 공개본을 실데이터에
+  연결하려면 신규 인증 수단(Cognito+JWT 오소라이저 또는 인증을 붙인 공개 중계)이 필요하며, 이번 작업에서는
+  AWS·Vercel 설정을 변경하지 않았습니다. 공개 API(`j3cwx5vmwj`)도 목 모드를 유지합니다.
+
 ## 비공개 AWS 연동 검증 준비 (실행 전, 승인 필요)
 
 공개 API는 예시 데이터 모드를 유지합니다. 아래는 승인 시 실행할 계획이며, 아직 실행하지 않았습니다.
@@ -304,8 +366,12 @@ AWS 키는 코드나 .env.example에 넣지 않으며 실행 역할을 사용합
 배포 ZIP과 캐시 파일은 Git에 올리지 않습니다.
 
 - 일반 서비스: src.lambda_function.lambda_handler
-- 콘솔 전용 연결 프로브: src.ml_integration_check.lambda_handler
-  - 고정 사용자·날짜 조회와 호출 검증을 위한 도구입니다. 공개 HTTP 경로에 연결하지 마세요.
+- 콘솔 전용 Athena 실데이터 경계 프로브: src.ml_integration_check.lambda_handler
+  - 이벤트 `{"target_date":"2016-04-10"}` 또는 `{"target_date":"2016-04-12"}`로 한 날짜만 조회·검증합니다.
+  - 허용 날짜 2개와 기존 테스트 사용자만 씁니다. 지원 외 날짜·API Gateway 이벤트는 ML 호출 전에 거절합니다.
+  - 기존 Athena 조회·요청 변환을 재사용해 활동·비활동 4개 컬럼 합계를 metrics.tracked_minutes 로 보내고,
+    요청 최상위에 notify=false 를 넣습니다. ML 을 정확히 한 번 호출합니다.
+  - 아래 "비공개 wearcare-mate-athena-test 실데이터 경계 검증" 참고. 공개 HTTP 경로에 연결하지 마세요.
 - 콘솔 전용 가상 이상 프로브: src.ml_virtual_anomaly_check.lambda_handler
   - 고정 가상 입력으로 AI/ML·Bedrock 호출과 화면용 변환을 확인합니다. Athena를 쓰지 않습니다.
   - API Gateway 형식 이벤트가 들어오면 AI/ML을 호출하지 않고 REFUSED를 돌려줍니다.

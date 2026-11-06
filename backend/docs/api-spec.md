@@ -375,7 +375,7 @@ SNS 발송은 AI/ML(wearcare-mate-ml)이 담당하며 alertSent는 표시·로�
 ### 🟢 확정된 사실
 - `GET /health` 는 구현·테스트 완료 (200/404/400 동작).
 - 구현된 엔드포인트 6개(`/health`, health-data, anomalies, guides, `/dashboard`, `/ai-guide`)는
-  로컬 unittest 428개로 검증됨. 공개 API는 mock, 별도 테스트 Lambda는 실제 Athena/AI 호출과 정상 API 응답 변환을 확인함.
+  로컬 unittest 434개로 검증됨. 공개 API는 mock, 별도 테스트 Lambda는 실제 Athena/AI 호출과 정상 API 응답 변환을 확인함.
   콘솔 전용 가상 이상 입력 검증으로 실제 AI/ML·Bedrock 가이드 생성과 화면용 변환(PASS)을 확인함(Athena 실제 데이터 미포함).
 - AI/ML 인터페이스는 `ml-interface-spec.md` **v0.5**(2026-11-06, 초안, 다운로드 명세) 과 v0.4 실제 코드
   (lambda_handler/detector, origin/ai-ml @ 1956156a)를 기준으로 요청 생성·응답 검증 및 화면용 변환이 구현됨.
