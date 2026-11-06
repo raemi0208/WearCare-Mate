@@ -10,16 +10,23 @@ import {
   user,
   summaryStats,
   timeseries,
+  timeseriesByRange,
   sleepStages,
   anomalies,
   aiGuide,
   notifications,
   devices,
   guideHistory,
+  mentalState,
+  musculoskeletal,
+  healthDomains,
+  dataSources,
+  feedbackRules,
+  feedbackFallback,
 } from "../data/mockData";
 import { loadProfile, saveProfile } from "./profileStorage";
 
-const API_BASE = process.env.REACT_APP_API_BASE || "";
+const API_BASE = (process.env.REACT_APP_API_BASE || "").trim().replace(/\/+$/, "");
 
 // 기본 사용자 정보에 브라우저에 저장된 프로필을 덮어씀
 function resolveUser(baseUser) {
@@ -50,15 +57,42 @@ export async function fetchDashboard() {
     user,
     summaryStats,
     timeseries,
+    timeseriesByRange,
     sleepStages,
     anomalies,
     aiGuide,
     notifications,
     devices,
     guideHistory,
+    mentalState,
+    musculoskeletal,
+    healthDomains,
+    dataSources,
   });
   // 프로필은 DB가 아닌 브라우저 localStorage 값을 우선 반영
   return { ...res, user: resolveUser(res.user) };
+}
+
+// 인터랙티브 컨디션 피드백
+// 사용자가 입력한 현재 컨디션 문장에 대해 AI 피드백을 반환합니다.
+// 실제 연동 시 Bedrock 프롬프트로 전달하고 생성 결과를 받습니다.
+export function sendConditionFeedback(message) {
+  if (API_BASE) {
+    return fetch(`${API_BASE}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    }).then((res) => {
+      if (!res.ok) throw new Error(`피드백 요청 실패: ${res.status}`);
+      return res.json();
+    });
+  }
+  // 목: 키워드 룰 기반 즉답
+  const text = (message || "").toLowerCase();
+  const matched = feedbackRules.find((rule) =>
+    rule.keywords.some((k) => (message || "").includes(k) || text.includes(k))
+  );
+  return delay({ reply: matched ? matched.reply : feedbackFallback }, 600);
 }
 
 export function fetchAiGuide() {

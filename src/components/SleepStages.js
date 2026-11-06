@@ -8,7 +8,7 @@ export default function SleepStages({ sleepStages }) {
   return (
     <Card
       title="수면 단계 분석"
-      subtitle="지난밤 수면 구조"
+      subtitle={segments.length ? "수면 구조" : "수면 단계 데이터가 연결되지 않았습니다"}
       action={<Badge variant="ghost">총 {totalLabel}</Badge>}
     >
       <div className="sleep-stages">

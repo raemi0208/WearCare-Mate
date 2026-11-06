@@ -7,6 +7,8 @@ import Topbar from "./components/Topbar";
 import DashboardPage from "./pages/DashboardPage";
 import TrendsPage from "./pages/TrendsPage";
 import AnomalyPage from "./pages/AnomalyPage";
+import MindPage from "./pages/MindPage";
+import BodyPage from "./pages/BodyPage";
 import GuidePage from "./pages/GuidePage";
 import DevicesPage from "./pages/DevicesPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -17,7 +19,7 @@ import { fetchDashboard, fetchAiGuide } from "./services/api";
 const PAGE_META = {
   dashboard: {
     title: "건강 대시보드",
-    subtitle: "최근 7일 웨어러블 데이터 분석 · 실시간 모니터링",
+    subtitle: "오늘 기준 건강 상태 요약 (기간별 추이는 추이 분석에서)",
   },
   trends: {
     title: "추이 분석",
@@ -25,7 +27,15 @@ const PAGE_META = {
   },
   anomaly: {
     title: "이상 탐지",
-    subtitle: "Amazon SageMaker 기반 이상 패턴 분석",
+    subtitle: "기록 데이터 기반 이상 패턴 분석",
+  },
+  mind: {
+    title: "심리·스트레스",
+    subtitle: "심리상담 점수 기반 정신 건강 상태",
+  },
+  body: {
+    title: "근골격계",
+    subtitle: "관절염 메타데이터 기반 통증 현황",
   },
   guide: {
     title: "AI 건강 가이드",
@@ -47,6 +57,7 @@ function App() {
   const [error, setError] = useState(null);
   const [activeNav, setActiveNav] = useState("dashboard");
   const [regenerating, setRegenerating] = useState(false);
+  const [guideError, setGuideError] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -69,11 +80,13 @@ function App() {
   }, []);
 
   const handleRegenerate = useCallback(() => {
+    setGuideError(null);
     setRegenerating(true);
     fetchAiGuide()
       .then((guide) => {
         setData((prev) => (prev ? { ...prev, aiGuide: guide } : prev));
       })
+      .catch(() => setGuideError("분석 및 가이드를 다시 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."))
       .finally(() => setRegenerating(false));
   }, []);
 
@@ -91,6 +104,10 @@ function App() {
         return <TrendsPage {...common} />;
       case "anomaly":
         return <AnomalyPage {...common} />;
+      case "mind":
+        return <MindPage {...common} />;
+      case "body":
+        return <BodyPage {...common} />;
       case "guide":
         return (
           <GuidePage
@@ -133,6 +150,7 @@ function App() {
         />
 
         <div className="content">
+          {guideError && <p role="alert">{guideError}</p>}
           {loading && <LoadingState />}
           {error && <ErrorState message={error} />}
           {data && !loading && !error && renderPage()}

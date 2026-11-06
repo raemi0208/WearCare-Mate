@@ -4,12 +4,14 @@ const NAV = [
   { id: "dashboard", icon: "▦", label: "대시보드" },
   { id: "trends", icon: "📈", label: "추이 분석" },
   { id: "anomaly", icon: "⚠", label: "이상 탐지" },
+  { id: "mind", icon: "🧠", label: "심리·스트레스" },
+  { id: "body", icon: "🦵", label: "근골격계" },
   { id: "guide", icon: "💬", label: "AI 가이드" },
   { id: "devices", icon: "⌚", label: "기기 연동" },
   { id: "settings", icon: "⚙", label: "설정" },
 ];
 
-export default function Sidebar({ active = "dashboard", onSelect = () => {} }) {
+export default function Sidebar({ active = "dashboard", onSelect = () => { } }) {
   return (
     <aside className="sidebar">
       <div className="sidebar__brand">
@@ -25,9 +27,8 @@ export default function Sidebar({ active = "dashboard", onSelect = () => {} }) {
           <button
             key={item.id}
             type="button"
-            className={`sidebar__nav-item ${
-              active === item.id ? "is-active" : ""
-            }`.trim()}
+            className={`sidebar__nav-item ${active === item.id ? "is-active" : ""
+              }`.trim()}
             onClick={() => onSelect(item.id)}
           >
             <span className="sidebar__nav-icon" aria-hidden="true">

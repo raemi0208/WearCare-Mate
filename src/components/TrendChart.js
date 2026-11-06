@@ -5,11 +5,11 @@ import LineChart from "./ui/LineChart";
 const TABS = [
   { id: "sleep", label: "수면", unit: "시간" },
   { id: "heartRate", label: "심박", unit: "bpm" },
-  { id: "steps", label: "활동량", unit: "보" },
+  { id: "steps", label: "활동량", unit: "걸음" },
 ];
 
 export default function TrendChart({ timeseries }) {
-  const [tab, setTab] = useState("sleep");
+  const [tab, setTab] = useState(() => TABS.find((t) => timeseries[t.id]?.length)?.id || "steps");
   const current = TABS.find((t) => t.id === tab);
   const data = timeseries[tab] || [];
   const hasAnomaly = data.some((d) => d.anomaly);
@@ -31,8 +31,8 @@ export default function TrendChart({ timeseries }) {
 
   return (
     <Card
-      title="시계열 추이"
-      subtitle={`최근 7일 ${current.label} 변화 (단위: ${current.unit})`}
+      title="최근 7일 추이"
+      subtitle={`${current.label} 기록 (단위: ${current.unit}) · 일/주/월 비교는 추이 분석에서`}
       action={tabs}
     >
       <div className="chart__legend">
@@ -43,7 +43,7 @@ export default function TrendChart({ timeseries }) {
         {hasAnomaly && (
           <span className="chart__legend-item">
             <span className="chart__swatch" style={{ background: "#9b2c2c" }} />
-            이상 패턴 (SageMaker 감지)
+            이상 패턴 (AI/ML 판정)
           </span>
         )}
       </div>

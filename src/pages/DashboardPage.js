@@ -5,21 +5,35 @@ import SleepStages from "../components/SleepStages";
 import AnomalyPanel from "../components/AnomalyPanel";
 import AiGuide from "../components/AiGuide";
 import Notifications from "../components/Notifications";
+import HealthDomains from "../components/HealthDomains";
 
 export default function DashboardPage({ data, onRegenerate, regenerating }) {
   return (
     <>
+      {data.analysis && (
+        <div className="card" style={{ padding: 16 }}>
+          <p>분석 기준일: {data.analysis.referenceDate}</p>
+          <p>{data.analysis.note}</p>
+        </div>
+      )}
       <div className="grid grid--stats">
         {data.summaryStats.map((s) => (
           <StatCard key={s.id} {...s} />
         ))}
       </div>
 
+      {data.healthDomains && (
+        <HealthDomains
+          domains={data.healthDomains}
+          dataSources={data.dataSources}
+        />
+      )}
+
       <div className="grid grid--main">
         <div className="grid">
           <TrendChart timeseries={data.timeseries} />
           <SleepStages sleepStages={data.sleepStages} />
-          <AnomalyPanel anomalies={data.anomalies} />
+          <AnomalyPanel anomalies={data.anomalies} analysis={data.analysis} />
         </div>
 
         <div className="grid">

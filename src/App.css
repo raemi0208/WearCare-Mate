@@ -399,6 +399,84 @@
   stroke-width: 2;
 }
 
+.linechart__value {
+  fill: var(--color-ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.linechart__value.is-anomaly {
+  fill: var(--color-danger);
+}
+
+.chart__empty {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+/* 추이 분석: 기간 토글 */
+.range-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.range-switch__tabs {
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+}
+
+.range-switch__tab {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 18px;
+  border: none;
+  background: transparent;
+  color: var(--color-muted);
+  border-radius: var(--radius-pill);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.range-switch__tab:hover:not(.is-active) {
+  color: var(--color-ink);
+}
+
+.range-switch__tab.is-active {
+  background: var(--color-ink);
+  color: #fff;
+}
+
+.range-switch__desc {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* 추이 분석: 이상 발생일 노트 */
+.trend-anomaly-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--color-ink-soft);
+  line-height: 1.5;
+}
+
+.trend-anomaly-note .anomaly-item__dot {
+  margin-top: 4px;
+}
+
 /* ===== 이상 탐지 ===== */
 .anomaly-list {
   display: flex;
@@ -507,6 +585,45 @@
   color: rgba(255, 255, 255, 0.78);
   margin-top: var(--space-3);
   line-height: 1.6;
+}
+
+/* 본문을 줄별로 표시할 때 각 줄 간 여백 */
+.ai-guide__text p+p {
+  margin-top: var(--space-2);
+}
+
+.ai-guide__sources {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ai-guide__sources-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+}
+
+.ai-guide__sources-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+
+.ai-guide__source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-pill);
+  padding: 4px 11px;
 }
 
 .ai-guide__actions {
@@ -936,4 +1053,369 @@
   font-size: 10px;
   color: var(--color-muted);
   margin-left: 2px;
+}
+
+/* ===== AI 컨디션 챗 ===== */
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.chat__messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chat__msg {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  max-width: 85%;
+}
+
+.chat__msg--user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.chat__msg--ai {
+  align-self: flex-start;
+}
+
+.chat__avatar {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-ink);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+
+.chat__bubble {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+}
+
+.chat__msg--ai .chat__bubble {
+  background: var(--color-panel);
+  color: var(--color-ink);
+  border-bottom-left-radius: 4px;
+}
+
+.chat__msg--user .chat__bubble {
+  background: var(--color-ink);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.chat__bubble--typing {
+  color: var(--color-muted);
+}
+
+.chat__dots {
+  animation: chat-blink 1.2s infinite;
+}
+
+@keyframes chat-blink {
+
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.chat__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chat__quick-btn {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-ink-soft);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.chat__quick-btn:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+  background: var(--color-panel);
+}
+
+.chat__quick-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat__input-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.chat__input {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.chat__input:focus {
+  border-color: var(--color-ink);
+}
+
+.chat__disclaimer {
+  font-size: 11px;
+  color: var(--color-faint);
+}
+
+/* ===== 통합 헬스케어 리포트 (Mind/Body/Life) ===== */
+.domain-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+.domain-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  padding: var(--space-4);
+}
+
+.domain-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.domain-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+}
+
+.domain-card__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.domain-card__subtitle {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+
+.domain-card__metrics {
+  margin-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.domain-metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: 13px;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.domain-metric:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.domain-metric__label {
+  color: var(--color-muted);
+}
+
+.domain-metric__value {
+  font-weight: 700;
+}
+
+/* Athena 데이터레이크 어필 뱃지 */
+.datalake-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-panel);
+}
+
+.datalake-badge__tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #fff;
+  background: var(--color-ink);
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+}
+
+.datalake-badge__text {
+  font-size: 12px;
+  color: var(--color-ink-soft);
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .domain-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== 심리 / 근골격계 페이지 ===== */
+.section-summary {
+  font-size: 14px;
+  color: var(--color-ink-soft);
+  margin-bottom: var(--space-5);
+  line-height: 1.6;
+}
+
+/* 점수 게이지 (심리 페이지) */
+.gauge-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.gauge__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.gauge__label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.gauge__value {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.gauge__max {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.gauge__track {
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.gauge__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.4s ease;
+}
+
+.gauge__fill.is-normal {
+  background: var(--color-ink);
+}
+
+.gauge__fill.is-warn {
+  background: var(--color-warn);
+}
+
+.gauge__fill.is-high {
+  background: var(--color-danger);
+}
+
+.gauge__foot {
+  margin-top: 6px;
+}
+
+/* 통증 부위 목록 (근골격계 페이지) */
+.pain-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.pain-item {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.pain-item:first-child {
+  padding-top: 0;
+}
+
+.pain-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.pain-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pain-item__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pain-item__note {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin-top: 3px;
+}
+
+/* 정보성 액션 항목 (가이드 권장) */
+.info-action {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
 }
