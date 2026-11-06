@@ -15,7 +15,8 @@ class IntegrationProbeTest(unittest.TestCase):
             client.return_value.invoke_detection.return_value = result
             response = probe.lambda_handler({}, None)
             client.return_value.invoke_detection.assert_called_once_with({
-                "user_id": "1503960366", "date": "2016-04-10", "metrics": {"steps": 10057}
+                "user_id": "1503960366", "date": "2016-04-10", "metrics": {"steps": 10057},
+                "notify": False,
             })
             self.assertEqual(response["statusCode"], 200)
             self.assertFalse(response["guide_generated"])

@@ -1,21 +1,29 @@
 """WearCare Mate 백엔드 - AI/ML(이상 탐지) 요청 생성과 응답 검증 (순수 함수).
 
-기준 자료 (읽기 전용 확인, origin/ai-ml @ 1956156a, 2026-11-03):
-    - docs/ml-interface-spec.md v0.4 (GitHub origin/ai-ml, 다운로드본과 내용 동일 확인)
-    - AI_ML/lambda_handler.py, AI_ML/detector.py
-    - docs/sample_responses.json
+기준 자료:
+    - docs/ml-interface-spec.md v0.5 (다운로드본 ~/Downloads/ml-interface-spec.md, 2026-11-06)
+    - v0.4 는 origin/ai-ml @ 1956156a 로 확인했고, v0.5 는 다운로드 명세 기준이다.
+    - AI_ML/lambda_handler.py, AI_ML/detector.py, docs/sample_responses.json (v0.4 커밋본)
 
-AI/ML v0.4 반영 (명세 v0.4 기준):
+AI/ML v0.4 반영:
     - 요청 metrics 에 tracked_minutes(기준일 활동 시간 네 값의 합)를 선택 전달. 네 값이 모두
       유효할 때만 보내고, 누락·오류면 생략한다(0 으로 채우지 않음).
       800 분 미만이면 AI/ML 이 "걸음 수 판정"만 건너뛴다(detector.personal_check → insufficient_data).
       다른 지표(수면·HRV·스트레스)는 그대로 판정한다. 백엔드는 합계만 전달한다.
     - 응답 guide 의 lines 배열을 그대로 보존한다.
-    - alert_sent 는 **응답 최상위** 선택 필드다(명세 7번, 핸들러 out["alert_sent"]=send_alert(out)).
-      guide 와 형제이며, guide 가 null 이어도(이상 아님·생성 실패) true/false 가 올 수 있다.
-      true/false/필드 없음을 구분한다. SNS 발송은 AI/ML(wearcare-mate-ml)이 담당한다(주제 wearcare-mate-alert).
-    ⚠️ 커밋된 sample_responses.json 에는 아직 alert_sent 가 없어, 검증에서는 최상위 선택 필드로 둔다.
-       실제 응답은 항상 alert_sent 를 포함한다.
+    - alert_sent 는 **응답 최상위** 선택 필드다(명세 7번). guide 와 형제이며, guide 가 null 이어도
+      true/false 가 올 수 있다. true/false/필드 없음을 구분한다.
+
+AI/ML v0.5 반영 (명세 v0.5, 2026-11-06):
+    - 요청 **최상위 notify**(불리언)를 추가. build_detection_request 는 기본 notify=False 를 보낸다.
+      /dashboard·/ai-guide 조회·재조회 경로는 SNS 발송을 하지 않으므로 notify=False 로 고정한다.
+      같은 요청을 재시도해도 값이 그대로 유지된다. 발송을 허용하는 일일 평가 경로(notify=True)는 별도 작업.
+    - 응답 **최상위 alert_reason**(문자열) 선택 처리. 값 집합: sent/disabled/notify_false/
+      below_threshold/duplicate/failed (ALERT_REASONS). 집합 밖 값도 거절하지 않고 보존한다.
+      v0.4 응답처럼 필드가 없는 경우(None)도 유효하다. guide 가 null 이어도 보존한다.
+    - SNS 발송 주체는 AI/ML Lambda(wearcare-mate-ml, 주제 wearcare-mate-alert). 백엔드는 발송하지 않는다.
+    ⚠️ 커밋된 sample_responses.json 에는 아직 alert_sent·alert_reason·notify 가 없어, 검증에서는
+       alert_sent·alert_reason 을 선택 필드로 둔다. 실제 v0.5 응답은 두 필드를 포함한다.
 
 현재 범위:
     - API(/dashboard, /ai-guide)는 ai_service.py를 통해 이 모듈을 사용한다.
@@ -72,6 +80,9 @@ _RANK = {"none": 0, "low": 1, "medium": 2, "high": 3}
 
 STEP_ANOMALY_TYPE = "ACTIVITY_DROP"
 STEP_METRIC = "steps"
+
+# v0.5 alert_reason 값 집합 (참고용). 검증은 "문자열이면 통과"로 하고 이 집합 밖 값도 보존한다.
+ALERT_REASONS = ("sent", "disabled", "notify_false", "below_threshold", "duplicate", "failed")
 
 # guide 상태 구분 (summarize_detection)
 GUIDE_GENERATED = "generated"            # status=anomaly, guide 있음
@@ -216,7 +227,7 @@ def build_history_steps(daily_steps, target_date):
 
 
 def build_detection_request(user_id, target_date, daily_steps, excluded_dates=(),
-                            daily_tracked_minutes=None):
+                            daily_tracked_minutes=None, notify=False):
     """AI/ML Lambda 요청 JSON 을 만든다. (걸음 수 기반 개인 기준선만, history_steps 미포함)
 
     과거 기록(history)은 AI/ML Lambda 가 Athena 에서 직접 읽는다(담당자 요청).
@@ -234,9 +245,13 @@ def build_detection_request(user_id, target_date, daily_steps, excluded_dates=()
             기준일 값이 있으면 metrics.tracked_minutes 로 전달하고, 없으면 생략한다.
             (네 활동 시간 중 하나라도 누락·오류면 그 날짜는 여기에 들어 있지 않으므로 자동으로 생략된다.
             누락값을 0 으로 채우지 않는다. 800 분 미만 판정 제외는 AI/ML 쪽 규칙이므로 백엔드는 합계만 보낸다.)
+        notify (bool): 요청 최상위 notify (AI/ML v0.5). 기본 False.
+            /dashboard·/ai-guide 조회·재조회 경로는 SNS 발송을 하지 않으므로 항상 notify=False 를 보낸다.
+            SNS 발송을 허용하는 일일 평가 경로는 별도 작업(notify=True)으로 남긴다.
+            값은 그대로 요청에 실리므로, 같은 요청을 재시도해도 notify=False 가 유지된다.
 
     Returns:
-        dict: {"user_id", "date", "metrics": {"steps"[, "tracked_minutes"]}}
+        dict: {"user_id", "date", "metrics": {"steps"[, "tracked_minutes"]}, "notify": <bool>}
 
     Raises:
         MLRequestError: 사용자 ID·날짜·입력 형식 오류
@@ -250,6 +265,8 @@ def build_detection_request(user_id, target_date, daily_steps, excluded_dates=()
         raise MLRequestError("daily_steps 는 날짜별 걸음 수 dict 여야 합니다.")
     if daily_tracked_minutes is not None and not isinstance(daily_tracked_minutes, dict):
         raise MLRequestError("daily_tracked_minutes 는 날짜별 기록 시간 dict 여야 합니다.")
+    if not isinstance(notify, bool):
+        raise MLRequestError("notify 는 불리언이어야 합니다.")
     if target in excluded:
         raise TargetNotEligibleError("excluded_date")
 
@@ -272,10 +289,12 @@ def build_detection_request(user_id, target_date, daily_steps, excluded_dates=()
             metrics["tracked_minutes"] = tracked
 
     # history_steps 는 넣지 않는다. (AI/ML Lambda 가 Athena 에서 직접 조회)
+    # notify 는 요청 최상위에 넣는다 (v0.5). 조회·재조회 경로는 False 로 SNS 발송을 막는다.
     return {
         "user_id": user_id,
         "date": target.isoformat(),
         "metrics": metrics,
+        "notify": notify,
     }
 
 
@@ -387,11 +406,16 @@ def validate_detection_result(body, expected_user_id=None, expected_date=None):
         _fail("anomaly_score 는 숫자 또는 null 이어야 합니다.")
     if not isinstance(body["model_version"], str) or not body["model_version"]:
         _fail("model_version 이 올바르지 않습니다.")
-    # alert_sent 는 응답 최상위의 선택 필드(v0.4 명세 7번, origin/ai-ml @ 1956156a). guide 와 형제다.
+    # alert_sent 는 응답 최상위의 선택 필드(v0.4 명세 7번). guide 와 형제다.
     # 실제 AI/ML 핸들러는 항상 넣지만(true/false), 커밋된 sample_responses.json 에는 아직 없어 선택으로 둔다.
     # 있으면 불리언이어야 하며, guide 가 null 이어도(status=anomaly 가 아니어도) 올 수 있다.
     if "alert_sent" in body and not isinstance(body["alert_sent"], bool):
         _fail("alert_sent 는 불리언이어야 합니다.")
+    # alert_reason 은 응답 최상위의 선택 필드(v0.5 명세 7번). 발송/미발송 사유. guide 와 형제다.
+    # 있으면 문자열이어야 한다. 값 집합(ALERT_REASONS) 외의 값이 와도 거절하지 않고 그대로 보존한다
+    # (AI/ML 이 새 사유를 추가할 수 있으므로). v0.4 응답처럼 필드가 없는 경우도 유효하다.
+    if "alert_reason" in body and not isinstance(body["alert_reason"], str):
+        _fail("alert_reason 은 문자열이어야 합니다.")
 
     if status == "anomaly":
         if not anomalies:
@@ -425,12 +449,14 @@ def summarize_detection(result):
             "guideState": "generated" | "missing" | "not_applicable",
             "guideWarningCount": int,     # 프론트 표시는 가능, 로그 수집용 (명세 8번)
             "alertSent": True | False | None,  # 응답 최상위 alert_sent (v0.4, 선택). 필드 없으면 None
+            "alertReason": str | None,    # 응답 최상위 alert_reason (v0.5, 선택). 필드 없으면 None
         }
         guideState 로 "이상이 없어 가이드가 없음"과 "이상이 있는데 가이드가 없음(생성 실패 등)"을 구분한다.
         alertSent 는 AI/ML(wearcare-mate-ml)이 SNS 를 발송했는지 알려 주는 응답 최상위 선택 필드다.
         True(발송함) / False(발송 안 함) / None(필드 없음 = 알 수 없음)을 구분한다.
-        guide 가 null(이상 아님·생성 실패)이어도 발송 결과는 보존한다.
-        백엔드는 SNS 를 직접 발송하지 않으며, 이 값은 표시·로그용으로만 전달한다.
+        alertReason 은 발송/미발송 사유(sent/disabled/notify_false/below_threshold/duplicate/failed 등).
+        guide 가 null(이상 아님·생성 실패)이어도 alertSent·alertReason 은 보존한다.
+        백엔드는 SNS 를 직접 발송하지 않으며, 이 값들은 표시·로그용으로만 전달한다.
     """
     status = result["status"]
     guide = result["guide"]
@@ -453,6 +479,8 @@ def summarize_detection(result):
         # 응답 최상위 alert_sent 를 읽는다(v0.4). guide 유무와 무관하게 true/false 를 보존하고,
         # 필드가 없으면 None. (기존 프론트엔드용 alertSent 계약: True/False/None)
         "alertSent": result.get("alert_sent"),
+        # 응답 최상위 alert_reason 을 읽는다(v0.5). 없으면 None. guide 가 null 이어도 보존.
+        "alertReason": result.get("alert_reason"),
     }
 
 

@@ -42,6 +42,9 @@ def _load_result(environ=None, athena_client_factory=None, ml_client_factory=Non
         request = build_detection_request(
             user_id, target, collect_daily_steps(items), excluded_dates=("2016-04-12",),
             daily_tracked_minutes=collect_daily_tracked_minutes(items),
+            # /dashboard·/ai-guide 조회·재조회 경로는 SNS 발송 안 함 → notify=False 고정 (v0.5).
+            # 같은 요청을 재시도해도 notify=False 가 유지된다. 발송 허용 일일 평가 경로는 별도 작업.
+            notify=False,
         )
     except TargetNotEligibleError:
         raise DataSourceUnavailableError("기준일에 판정 가능한 걸음 수가 없습니다.") from None
@@ -54,7 +57,8 @@ def guide_for_frontend(result):
     """Preserve frontend's model/updatedAt/headline/text/actions fields.
 
     guide.lines 는 lines 로 그대로 전달한다(줄별 표시용). alertSent 는 AI/ML 의 SNS 발송 여부
-    (true/false/null)를 표시·로그용으로 넘긴다. 백엔드는 SNS 를 직접 발송하지 않는다.
+    (true/false/null), alertReason 은 발송/미발송 사유(v0.5, 없으면 null)를 표시·로그용으로 넘긴다.
+    백엔드는 SNS 를 직접 발송하지 않는다. guide 가 null 이어도 alertSent·alertReason 은 보존한다.
     """
     guide = result["guide"]
     summary = summarize_detection(result)
@@ -64,6 +68,7 @@ def guide_for_frontend(result):
         "updatedAt": guide["generated_at"] if guide else "생성된 가이드 없음",
         "warnings": list(guide["warnings"]) if guide else [],
         "alertSent": summary["alertSent"],
+        "alertReason": summary["alertReason"],
     }
     if guide:
         lines = guide["lines"]

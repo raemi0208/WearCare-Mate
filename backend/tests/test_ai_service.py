@@ -63,7 +63,8 @@ class AIServiceTest(unittest.TestCase):
         self.assertEqual(body["timeseries"]["sleep"], [])
         self.assertEqual([v["value"] for v in body["timeseries"]["steps"]], [10000, 2100])
         self.assertEqual([v["anomaly"] for v in body["timeseries"]["steps"]], [False, True])
-        self.assertEqual(client.requests, [{"user_id": "1503960366", "date": "2016-04-10", "metrics": {"steps": 2100}}])
+        self.assertEqual(client.requests, [{"user_id": "1503960366", "date": "2016-04-10",
+                                            "metrics": {"steps": 2100}, "notify": False}])
         fetch.assert_called_once()
 
     def test_guide_route_normal_has_no_fabricated_generation(self):
@@ -128,6 +129,30 @@ class AIServiceTest(unittest.TestCase):
         normal = result_for("normal")
         normal["alert_sent"] = False
         self.assertIs(ai_service.guide_for_frontend(normal)["alertSent"], False)
+
+    def test_alert_reason_passed_through_and_preserved(self):
+        """alert_reason(v0.5)을 화면용 alertReason 으로 전달. 없으면 None, guide null 이어도 보존."""
+        self.assertIsNone(ai_service.guide_for_frontend(result_for())["alertReason"])  # 필드 없음
+        sent = result_for()
+        sent["alert_sent"] = True
+        sent["alert_reason"] = "sent"
+        self.assertEqual(ai_service.guide_for_frontend(sent)["alertReason"], "sent")
+        # guide 없음 + 미발송 사유 보존
+        normal = result_for("normal")
+        normal["alert_sent"] = False
+        normal["alert_reason"] = "below_threshold"
+        g = ai_service.guide_for_frontend(normal)
+        self.assertIs(g["alertSent"], False)
+        self.assertEqual(g["alertReason"], "below_threshold")
+
+    def test_request_sends_notify_false(self):
+        """/dashboard·/ai-guide 조회 경로의 ML 요청 최상위에 notify=False 가 들어간다 (v0.5)."""
+        client = FakeLambda(result_for())
+        with patch.dict(os.environ, ENV, clear=True), \
+             patch.object(ai_service, "fetch_dashboard_activity_items", return_value=copy.deepcopy(ITEMS)), \
+             patch.object(ai_service, "create_lambda_client", return_value=client):
+            ai_service.build_ai_guide()
+        self.assertIs(client.requests[0]["notify"], False)
 
     def test_tracked_minutes_sent_when_items_have_minutes(self):
         """활동 시간 네 값이 모두 있는 기준일이면 요청 metrics 에 tracked_minutes 를 담는다."""

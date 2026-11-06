@@ -151,8 +151,8 @@ class BuildDetectionRequestTest(unittest.TestCase):
     # 아래 3개 테스트는 AI/ML 담당자 요청(history_steps 미전달)에 맞춰 기대값을 바꿨다.
     # (이전: 요청에 history_steps 포함 → 현재: 미포함, 과거 기록은 AI/ML 이 Athena 에서 직접 조회)
 
-    def test_request_matches_v03_required_fields_without_history(self):
-        """요청은 v0.3 lambda_handler 필수 필드(user_id, date, metrics)만 담는다."""
+    def test_request_has_required_fields_and_notify_false(self):
+        """요청은 user_id, date, metrics 와 최상위 notify(기본 False)를 담는다 (v0.5)."""
         daily = days_before(TARGET, 6)
         daily[TARGET] = 2100
         request = build_detection_request(USER_ID, TARGET, daily)
@@ -160,14 +160,28 @@ class BuildDetectionRequestTest(unittest.TestCase):
             "user_id": USER_ID,
             "date": "2016-04-10",
             "metrics": {"steps": 2100},
+            "notify": False,
         })
 
     def test_no_other_metrics_or_history_are_created(self):
-        """수면·HRV·스트레스 등 없는 지표, context, history_steps 를 넣지 않는다."""
+        """수면·HRV·스트레스 등 없는 지표, context, history_steps 를 넣지 않는다. notify 는 최상위에만."""
         daily = {TARGET: 5000}
         request = build_detection_request(USER_ID, "2016-04-10", daily)
-        self.assertEqual(set(request.keys()), {"user_id", "date", "metrics"})
+        self.assertEqual(set(request.keys()), {"user_id", "date", "metrics", "notify"})
         self.assertEqual(request["metrics"], {"steps": 5000})
+        self.assertIs(request["notify"], False)
+
+    def test_notify_defaults_false_and_accepts_true(self):
+        """notify 기본은 False. True 를 명시하면 그대로 전달하고, 재시도해도 값이 유지된다."""
+        daily = {TARGET: 5000}
+        self.assertIs(build_detection_request(USER_ID, TARGET, daily)["notify"], False)
+        r_true = build_detection_request(USER_ID, TARGET, daily, notify=True)
+        self.assertIs(r_true["notify"], True)
+        # 같은 인자로 다시 만들어도 값이 그대로 유지됨
+        self.assertEqual(build_detection_request(USER_ID, TARGET, daily, notify=True), r_true)
+        # notify 는 불리언이어야 한다
+        with self.assertRaises(MLRequestError):
+            build_detection_request(USER_ID, TARGET, daily, notify="false")
 
     def test_history_is_never_sent_even_with_many_past_records(self):
         """과거 기록이 충분히 있어도 요청에는 기준일 걸음 수만 들어간다."""
@@ -429,6 +443,30 @@ class ValidateViolationsTest(unittest.TestCase):
             body["alert_sent"] = value
             self.assert_invalid(body)
 
+    def test_optional_top_level_alert_reason_is_accepted(self):
+        """alert_reason(v0.5)은 응답 최상위 선택 문자열. 값 집합 내/외 문자열 모두 유효, 없어도 유효."""
+        for value in ("sent", "notify_false", "below_threshold", "duplicate", "disabled",
+                      "failed", "some_future_reason"):
+            body = self.anomaly_body()
+            body["alert_reason"] = value
+            validate_detection_result(body)
+        body = self.anomaly_body()
+        self.assertNotIn("alert_reason", body)  # v0.4 처럼 필드 없는 경우
+        validate_detection_result(body)
+
+    def test_alert_reason_allowed_when_guide_null(self):
+        """guide 가 없어도(이상 아님) 최상위 alert_reason 은 올 수 있다."""
+        body = sample("normal")["response"]
+        body["alert_sent"] = False
+        body["alert_reason"] = "below_threshold"
+        validate_detection_result(body)
+
+    def test_non_string_alert_reason_is_rejected(self):
+        for value in (1, True, ["sent"], {}):
+            body = self.anomaly_body()
+            body["alert_reason"] = value
+            self.assert_invalid(body)
+
     def test_consistency_rules(self):
         body = self.anomaly_body()
         body["anomalies"] = []
@@ -486,7 +524,7 @@ class SummarizeDetectionTest(unittest.TestCase):
         self.assertEqual(summary, {
             "date": "2026-10-30", "status": "anomaly", "overallSeverity": "high",
             "stepAnomaly": True, "guideState": GUIDE_GENERATED, "guideWarningCount": 0,
-            "alertSent": None,
+            "alertSent": None, "alertReason": None,
         })
 
     def test_alert_sent_true_false_none_are_distinguished(self):
@@ -510,6 +548,16 @@ class SummarizeDetectionTest(unittest.TestCase):
         normal = self.summarize("normal", lambda b: b.update(alert_sent=False))
         self.assertEqual(normal["guideState"], GUIDE_NOT_APPLICABLE)
         self.assertIs(normal["alertSent"], False)
+
+    def test_alert_reason_is_surfaced_and_preserved(self):
+        """alert_reason(v0.5)을 alertReason 으로 그대로 전달한다. 필드 없으면 None, guide null 이어도 보존."""
+        self.assertIsNone(self.summarize("activity_drop_high")["alertReason"])  # 필드 없음
+        sent = self.summarize("activity_drop_high", lambda b: b.update(alert_sent=True, alert_reason="sent"))
+        self.assertEqual(sent["alertReason"], "sent")
+        # guide 없음 + 미발송 사유 보존
+        normal = self.summarize("normal", lambda b: b.update(alert_sent=False, alert_reason="below_threshold"))
+        self.assertIs(normal["alertSent"], False)
+        self.assertEqual(normal["alertReason"], "below_threshold")
 
     def test_anomaly_without_guide_is_distinguished(self):
         """이상이 있는데 guide=null 이면 'missing' (이상 없음의 'not_applicable' 과 구분)."""

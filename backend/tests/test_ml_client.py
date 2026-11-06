@@ -234,7 +234,8 @@ class RequestWithoutHistoryTest(unittest.TestCase):
         client.invoke_detection(self.request)
         sent = json.loads(fake.calls[0]["Payload"].decode("utf-8"))
         self.assertEqual(sent, {"user_id": "1000000001", "date": "2016-04-10",
-                                "metrics": {"steps": 2100}})
+                                "metrics": {"steps": 2100}, "notify": False})
+        self.assertNotIn("history_steps", sent)
 
     def test_current_lambda_without_athena_returns_insufficient_data(self):
         """3dc9a94 의 load_history_steps 는 미구현([] 반환)이라, history 없이 보내면

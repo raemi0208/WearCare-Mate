@@ -329,9 +329,11 @@
   기기·알림·가이드 저장 이력은 연결되지 않아 빈 배열입니다.
 - 통계 기준 주는 ML_TARGET_DATE 이하의 유효 기록이 있는 최근 주입니다.
   데이터 없는 날은 0으로 채우지 않으며 지난주 비교 불가 시 delta=null입니다.
-- 실제 AI 요청은 {user_id, date, metrics: {steps[, tracked_minutes]}}입니다. history_steps는 AI/ML이 Athena에서 읽습니다.
+- 실제 AI 요청은 {user_id, date, metrics: {steps[, tracked_minutes]}, notify}입니다. history_steps는 AI/ML이 Athena에서 읽습니다.
   tracked_minutes(기준일 활동 시간 네 값의 합)는 네 값이 모두 유효할 때만 보내고 아니면 생략합니다(0으로 채우지 않음).
   800분 미만 판정 제외는 AI/ML 규칙이며 백엔드는 합계만 전달합니다(v0.4).
+  notify(최상위 불리언, v0.5)는 조회·재조회 경로에서 항상 false로 보내 SNS 발송을 막습니다. 재시도해도 값이 유지됩니다.
+  SNS 발송을 허용하는 일일 평가 경로(notify=true)는 별도 작업입니다.
 - low/medium -> warn, high -> danger. 정상 판정은 anomalies=[]입니다.
 - analysis에는 referenceDate, status, overallSeverity, evaluatedDates, note가 있습니다.
   evaluatedDates에 포함된 날짜만 판정했습니다. 다른 차트 지점의 anomaly=false는 정상 판정이 아닙니다.
@@ -350,6 +352,8 @@ AI_SOURCE=mock이면 기존 예시 가이드, real이면 위와 같은 대상·�
 - lines: 가이드 줄 배열(guide.lines 그대로). 줄별 표시용 (v0.4).
 - alertSent: AI/ML의 SNS 발송 여부(응답 최상위 alert_sent). true / false / null(필드 없음)로 구분 (v0.4).
   guide가 없어도(정상·생성 실패) 발송 결과는 보존됩니다.
+- alertReason: 발송/미발송 사유(응답 최상위 alert_reason, v0.5). 문자열 또는 null(필드 없음).
+  값 예: sent / disabled / notify_false / below_threshold / duplicate / failed. guide가 없어도 보존됩니다.
 - status: generated / missing / not_applicable.
 - analysisStatus: anomaly / normal / insufficient_data.
 - referenceDate: YYYY-MM-DD 기준일.
@@ -371,11 +375,12 @@ SNS 발송은 AI/ML(wearcare-mate-ml)이 담당하며 alertSent는 표시·로�
 ### 🟢 확정된 사실
 - `GET /health` 는 구현·테스트 완료 (200/404/400 동작).
 - 구현된 엔드포인트 6개(`/health`, health-data, anomalies, guides, `/dashboard`, `/ai-guide`)는
-  로컬 unittest 410개로 검증됨. 공개 API는 mock, 별도 테스트 Lambda는 실제 Athena/AI 호출과 정상 API 응답 변환을 확인함.
+  로컬 unittest 428개로 검증됨. 공개 API는 mock, 별도 테스트 Lambda는 실제 Athena/AI 호출과 정상 API 응답 변환을 확인함.
   콘솔 전용 가상 이상 입력 검증으로 실제 AI/ML·Bedrock 가이드 생성과 화면용 변환(PASS)을 확인함(Athena 실제 데이터 미포함).
-- AI/ML 인터페이스는 `origin/ai-ml` @ `1956156a` 의 `ml-interface-spec.md` **v0.4**(2026-11-03, 초안) 과
-  실제 코드(lambda_handler/detector)를 기준으로 요청 생성·응답 검증 및 화면용 변환이 구현됨.
+- AI/ML 인터페이스는 `ml-interface-spec.md` **v0.5**(2026-11-06, 초안, 다운로드 명세) 과 v0.4 실제 코드
+  (lambda_handler/detector, origin/ai-ml @ 1956156a)를 기준으로 요청 생성·응답 검증 및 화면용 변환이 구현됨.
   v0.4 반영: metrics.tracked_minutes 전달, guide.lines 보존, 응답 최상위 alert_sent 처리.
+  v0.5 반영: 요청 최상위 notify(조회·재조회 false), 응답 최상위 alert_reason 선택 처리.
   새 API의 이상·생성 경로 AWS 통합 검증은 남아 있음.
 - 데이터 저장소는 Athena(us-east-2, `fitbit_activity_table`)로 확인됨. 수면·심박 데이터는 없음.
 - REAL 모드는 `ENABLE_REAL_DATA_TESTING` + `DASHBOARD_USER_ID` 가 필요한 개발·통합 테스트 전용이며,
