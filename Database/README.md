@@ -15,34 +15,37 @@ Database/
 │   ├── load_to_timestream.py         # FitBit 활동 데이터 적재 스크립트
 │   └── load_sleep_to_timestream.py   # 수면 및 생체 지표 데이터 적재 스크립트
 └── README.md
+```
 
 [AWS Infrastructure Specifications]
-Cloud Region: us-east-2 (AWS Ohio)
+- Cloud Region: us-east-2 (AWS Ohio)
 
-Storage Layer (S3): 원본 데이터 및 전처리 데이터 적재 레이크 구조 설계
+- Storage Layer (S3): 원본 데이터 및 전처리 데이터 적재 레이크 구조 설계
 
-Time-Series Database: Amazon Timestream for LiveAnalytics
+- Time-Series Database: Amazon Timestream for LiveAnalytics
 
-Database Name: wearcare_mate_db
+- Database Name: wearcare_mate_db
 
-Data Retention Policy: 마그네틱 스토어 보존 기간 31일 설정 (프로젝트 기간 내 최적화)
+- Data Retention Policy: 마그네틱 스토어 보존 기간 31일 설정 (프로젝트 기간 내 최적화)
+
 
 [Table Schemas]
-fitbit_activity_table (FitBit 활동 데이터)
+- fitbit_activity_table (FitBit 활동 데이터)
 
-Timestamp: ActivityDate (날짜별 시계열 타임스탬프)
+- Timestamp: ActivityDate (날짜별 시계열 타임스탬프)
 
-Dimensions (차원): Id (사용자 식별자)
+- Dimensions (차원): Id (사용자 식별자)
 
-Measures (측정값): TotalSteps, TotalDistance, Calories, SedentaryMinutes 등
+- Measures (측정값): TotalSteps, TotalDistance, Calories, SedentaryMinutes 등
 
-wearable_sleep_table (수면 및 스트레스 데이터)
+- wearable_sleep_table (수면 및 스트레스 데이터)
 
-Timestamp: 측정 일시 (타임스탬프 밀리초 변환 적용)
+- Timestamp: 측정 일시 (타임스탬프 밀리초 변환 적용)
 
-Dimensions (차원): UserId (사용자 식별자)
+- Dimensions (차원): UserId (사용자 식별자)
 
-Measures (측정값): Heart_Rate_Variability, Body_Temperature, Sleep_Duration_Hours, Stress_Level, Sleep_Quality_Score 등
+- Measures (측정값): Heart_Rate_Variability, Body_Temperature, Sleep_Duration_Hours, Stress_Level, Sleep_Quality_Score 등
+
 
 [How to Run Ingestion Scripts]
 1. 사전 요구사항 및 환경 설정
