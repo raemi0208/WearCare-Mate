@@ -204,10 +204,17 @@
   </div>
 
   <script>
-    // 실제 인증 로직 없이 대시보드(React 앱 루트)로 이동만 처리
+    // 실제 인증 로직 없이, 로그인 여부 플래그만 세운 뒤 대시보드(React 앱 루트)로 이동
+    // sessionStorage를 사용하므로 탭을 닫으면 초기화되어 다음 접속 시 다시 로그인 화면부터 시작합니다.
     function goToDashboard(event) {
       event.preventDefault();
-      window.location.href = "/";
+      try {
+        sessionStorage.setItem("wearcare.loggedIn", "1");
+      } catch (e) {
+        // 저장 실패해도 대시보드 이동은 진행
+      }
+      // login.html과 같은 위치의 앱 루트(index.html)로 이동. 하위 경로 배포에서도 안전하도록 상대 경로 사용.
+      window.location.href = "./";
     }
   </script>
 </body>
