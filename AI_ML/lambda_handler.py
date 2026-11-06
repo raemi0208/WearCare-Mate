@@ -10,6 +10,7 @@ API Gateway(프록시 통합) 또는 직접 호출의 입력(스펙 6번)을 받
   SNS_TOPIC_ARN     이상 알림을 보낼 SNS 주제. 비우면 알림을 보내지 않는다 (기본값: 비움)
   SNS_REGION        기본 ap-northeast-2
   SNS_MIN_SEVERITY  알림을 보낼 최소 단계 (기본 medium)
+  ALERT_DEDUPE_SECONDS  같은 사용자+날짜에 다시 보내지 않을 시간(초). 기본 21600(6시간), 0이면 끔
 필요 권한(Lambda 실행 역할): bedrock:InvokeModel, 그리고 us-east-2의 athena:StartQueryExecution/GetQueryExecution/GetQueryResults,
   glue:GetDatabase/GetTable/GetPartitions, 데이터 버킷 읽기 + 결과 위치(ATHENA_OUTPUT) 쓰기.
   SNS를 쓰면 해당 주제에 대한 sns:Publish 권한도 필요.
@@ -38,6 +39,8 @@ STEPS_COL = os.environ.get("STEPS_COL", "totalsteps")
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN", "")
 SNS_REGION = os.environ.get("SNS_REGION", "ap-northeast-2")
 SNS_MIN_SEVERITY = os.environ.get("SNS_MIN_SEVERITY", "medium")  # 이 단계 이상일 때만 발송
+ALERT_DEDUPE_SECONDS = float(os.environ.get("ALERT_DEDUPE_SECONDS", "21600"))  # 같은 사용자+날짜 재발송 방지 (0이면 끔)
+_alert_sent_at = {}  # (user_id, date) -> 발송 시각. 같은 실행 환경 안에서만 유지된다
 
 
 def load_history_steps(user_id, date):
@@ -90,13 +93,23 @@ _TYPE_LABEL = {"ACTIVITY_DROP": "활동량 감소", "HRV_LOW": "심박 변이도
                "SLEEP_RESTLESS": "수면 중 뒤척임"}
 
 
-def send_alert(out):
+def send_alert(out, notify=True):
     """overall_severity가 SNS_MIN_SEVERITY 이상이면 SNS로 알림을 보낸다.
-    실패해도 탐지 결과 반환에는 영향을 주지 않는다. 반환: 보냈으면 True."""
+    보내지 않는 경우: SNS_TOPIC_ARN 미설정 / 요청의 notify가 false / 심각도 미달 /
+    같은 사용자+날짜로 ALERT_DEDUPE_SECONDS 안에 이미 보냄.
+    실패해도 탐지 결과 반환에는 영향을 주지 않는다. 반환: (보냈으면 True, 사유 문자열)."""
     if not SNS_TOPIC_ARN:
-        return False
+        return False, "disabled"
+    if not notify:
+        return False, "notify_false"
     if _SEV_RANK.get(out.get("overall_severity"), 0) < _SEV_RANK.get(SNS_MIN_SEVERITY, 2):
-        return False
+        return False, "below_threshold"
+    key = (out.get("user_id"), out.get("date"))
+    now = time.time()
+    if ALERT_DEDUPE_SECONDS > 0:
+        last = _alert_sent_at.get(key)
+        if last is not None and now - last < ALERT_DEDUPE_SECONDS:
+            return False, "duplicate"
     try:
         import boto3
         sev = out["overall_severity"]
@@ -113,10 +126,11 @@ def send_alert(out):
             Subject=f"[WearCare Mate] 건강 이상 징후 알림 ({_SEV_LABEL.get(sev, sev)})",
             Message="\n".join(lines),
         )
-        return True
+        _alert_sent_at[key] = now
+        return True, "sent"
     except Exception as e:  # ALERT_FAILED
         print("ALERT_FAILED:", repr(e))
-        return False
+        return False, "failed"
 
 
 def _response(code, body):
@@ -154,5 +168,7 @@ def lambda_handler(event, context=None):
         out["guide"] = generate_guide(out["anomalies"], MODEL_ID, BEDROCK_REGION, body.get("context"))
 
     # 스펙 3주차: medium 이상이면 SNS 알림. 실패해도 응답은 그대로 돌려준다
-    out["alert_sent"] = send_alert(out)
+    # 요청에 "notify": false 를 주면 보내지 않는다 (재조회, 재시도, 테스트용)
+    notify = body.get("notify", True) is not False
+    out["alert_sent"], out["alert_reason"] = send_alert(out, notify)
     return _response(200, out)

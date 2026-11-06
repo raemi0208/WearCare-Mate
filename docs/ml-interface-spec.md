@@ -1,4 +1,4 @@
-# WearCare Mate - AI/ML 인터페이스 스펙 (v0.4)
+# WearCare Mate - AI/ML 인터페이스 스펙 (v0.5)
 
 - 작성: 조채환 (AI/ML 파트) / 2026-10-30
 - 상태: **초안 - 팀 확인 필요** (확인 요청은 10번)
@@ -111,11 +111,13 @@
   },
   "context": {
     "caffeine_intake_mg": 240
-  }
+  },
+  "notify": true
 }
 ```
 
 - 있는 지표만 판정한다. 필수 지표가 모두 없으면 `insufficient_data`.
+- `notify`(선택, 기본 `true`): `false`면 조건을 만족해도 **SNS 알림을 보내지 않는다**. 가이드 재조회, 요청 재시도, 테스트에 쓴다. 탐지 결과와 가이드는 그대로 돌려준다.
 - `tracked_minutes`(선택): 그날 기록 시간 합계(활동 3종 + 비활동 분). **800분 미만이면 부분 수집으로 보고 걸음 수 판정을 건너뛴다** (11번 참고). 보내지 않으면 지금까지와 동일하게 동작한다.
 - 컬럼명 별칭: `sleep_duration_hours` → `sleep_hours`, `totalsteps`/`total_steps` → `steps`. 테이블 컬럼명을 그대로 보내도 된다.
 - 개인 기준선(걸음 수)용 과거 기록은 **AI/ML이 Athena에서 읽는다**: 기준일 파라미터로 `기준일 - 14일 <= 날짜 < 기준일` 조회 (오늘 기준 `CURRENT_DATE`는 과거 데이터에서 0건이라 쓰지 않음). 수면 테이블의 날짜는 문자열이라 변환이 필요하다.
@@ -160,6 +162,7 @@
     "generated_at": "2016-04-11T08:00:00+09:00"
   },
   "alert_sent": true,
+  "alert_reason": "sent",
   "model_version": "activity-zscore-v0.2+pop-v0.3"
 }
 ```
@@ -174,10 +177,13 @@
 | guide.lines | 가이드 3줄의 배열. **화면에는 이 값을 한 줄씩 그리면 된다** (`text`는 같은 내용을 `\n`으로 이은 것) |
 | guide.warnings | 생성 규칙 위반 경고 목록. 비어 있으면 규칙을 모두 지킨 것. 값이 있어도 가이드는 그대로 표시하면 된다 |
 | alert_sent | SNS 알림을 보냈으면 `true` (아래 규칙 참고) |
+| alert_reason | 발송/미발송 사유. `sent` / `disabled`(주제 미설정) / `notify_false`(요청이 `notify: false`) / `below_threshold`(medium 미만) / `duplicate`(같은 사용자+날짜 재발송 방지) / `failed`(발송 실패) |
 
 - **SNS 알림**: `overall_severity`가 `medium` 이상일 때만. `low`는 대시보드에만 표시.
   - AI/ML Lambda(`wearcare-mate-ml`, 서울)에서 직접 발송한다. 주제: `wearcare-mate-alert`
-  - 발송 여부는 응답의 `alert_sent`로 알 수 있다. 발송에 실패해도 탐지 결과는 그대로 돌려준다 (`alert_sent: false`).
+  - 발송 여부는 응답의 `alert_sent`, 사유는 `alert_reason`으로 알 수 있다. 발송에 실패해도 탐지 결과는 그대로 돌려준다 (`alert_sent: false`).
+  - **중복 발송 방지**: 같은 `user_id` + `date` 조합은 `ALERT_DEDUPE_SECONDS`(기본 6시간) 안에 다시 보내지 않는다 (`alert_reason: duplicate`). 다만 이 기록은 Lambda 실행 환경 안에만 남아서, 환경이 새로 뜨거나 동시에 여러 개가 뜨면 다시 보낼 수 있다. **확실하게 막으려면 재조회·재시도 요청에 `notify: false`를 보낸다.**
+  - **테스트 중 발송 끄기**: 요청에 `notify: false`를 넣는 방법(권장, 코드 변경 없음), 환경 변수 `SNS_TOPIC_ARN`을 비우는 방법, 테스트용 주제 ARN을 넣는 방법 중 하나를 쓴다.
 - 오류: `{"error": {"code": "INVALID_INPUT", "message": "..."}}` (code 예: INVALID_INPUT, MODEL_ERROR, GUIDE_FAILED). 가이드 생성이 실패해도 탐지 결과는 돌려준다 (`guide: null`).
 
 ## 8. Bedrock 가이드 규칙
@@ -230,4 +236,5 @@
 - v0.2 (2026-10-30): 실제 데이터 확인 반영, 탐지 방식 분리 (개인 기준선 / 집단 기준), 기준선 5~14개 기록, 심각도 3단계와 주입 테스트 결과 추가, RHR_HIGH 보류
 - v0.3 (2026-10-30): 집단 기준 확정 (나쁜 방향 z, 심각도 2.0/2.5/3.0, 집단 평균·표준편차), SLEEP_QUALITY_LOW를 SLEEP_RESTLESS로 교체, 수면 점수 제외, 움직임 음수 보정, 문서 내 확인 요청 번호 정정
 - v0.3 추가 (2026-10-30): Bedrock 규칙에 anomalies 심각도순 정렬과 입력 순서 처리, 수치 인용, 줄 처리 규칙 추가
+- v0.5 (2026-11-06): 입력 `notify` 추가(알림 끄기), 출력 `alert_reason` 추가, 같은 사용자+날짜 중복 발송 방지(기본 6시간) 추가
 - v0.4 (2026-11-03): Lambda 배포 완료(`wearcare-mate-ml`, 서울) 및 Athena 조회·Bedrock 호출 실제 동작 확인, 걸음 수 단위를 "보"에서 "걸음"으로 통일, SNS 알림 연동과 `alert_sent` 필드 추가, 출력에 `guide.lines`·`guide.warnings` 명시, 11번 데이터 주의사항(2016-04-12 부분 수집)과 부분 수집 방어용 입력 `metrics.tracked_minutes` 추가
