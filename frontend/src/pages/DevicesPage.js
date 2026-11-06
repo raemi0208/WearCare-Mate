@@ -20,6 +20,7 @@ export default function DevicesPage({ data }) {
         action={<Badge variant="ghost">{connected} / {devices.length} 연결</Badge>}
       >
         <div className="device-list">
+          {devices.length === 0 && <p>연결된 기기 정보가 없습니다.</p>}
           {devices.map((d) => {
             const st = STATUS[d.status] || STATUS.disconnected;
             return (
