@@ -1,0 +1,8 @@
+# WearCare Mate 백엔드 의존성 목록
+#
+# MOCK 경로와 단위 테스트에는 Python 표준 라이브러리만 사용합니다.
+# 실제 Athena/Lambda 호출에는 boto3와 botocore가 필요합니다.
+# 현재 배포는 Lambda Python 런타임에 포함된 AWS SDK를 사용했습니다.
+#
+# 로컬 실제 AWS 실행이나 SDK 버전 고정 배포가 필요하면
+# 검증할 boto3/botocore 호환 버전을 정한 뒤 의존성을 추가하세요.

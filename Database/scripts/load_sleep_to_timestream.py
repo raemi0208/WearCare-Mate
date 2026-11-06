@@ -75,4 +75,4 @@ if records:
     except Exception as e:
         print(f"마지막 레코드 전송 에러: {e}")
 
-print("🎉 Timestream 데이터 적재가 완료되었습니다!")
+print("Timestream 데이터 적재 완료")
