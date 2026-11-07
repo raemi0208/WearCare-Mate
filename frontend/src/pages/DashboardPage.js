@@ -5,6 +5,7 @@ import SleepStages from "../components/SleepStages";
 import AnomalyPanel from "../components/AnomalyPanel";
 import AiGuide from "../components/AiGuide";
 import Notifications from "../components/Notifications";
+import DatasetSummaryCards from "../components/DatasetSummaryCards";
 
 export default function DashboardPage({ data, onRegenerate, regenerating }) {
   return (
@@ -20,6 +21,8 @@ export default function DashboardPage({ data, onRegenerate, regenerating }) {
           <StatCard key={s.id} {...s} />
         ))}
       </div>
+
+      <DatasetSummaryCards data={data} />
 
       <div className="grid grid--main">
         <div className="grid">

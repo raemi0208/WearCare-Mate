@@ -18,8 +18,24 @@ import {
   guideHistory,
 } from "../data/mockData";
 import { loadProfile, saveProfile } from "./profileStorage";
+import { apiBase, isAuthEnabled } from "./authConfig";
+import { getAccessToken } from "./cognitoAuth";
 
-const API_BASE = (process.env.REACT_APP_API_BASE || "").trim().replace(/\/+$/, "");
+// 인증 모드에서는 authConfig.apiBase 를, 목/로컬에서는 REACT_APP_API_BASE 를 사용.
+// (두 값은 같은 REACT_APP_API_BASE 에서 오지만, 인증 모드 여부로 토큰 첨부를 분기한다.)
+// 함수 호출 시점에 계산한다(설정이 런타임에 결정되는 경우/테스트 mock 반영).
+function resolveApiBase() {
+  return apiBase || (process.env.REACT_APP_API_BASE || "").trim().replace(/\/+$/, "");
+}
+
+// 인증이 필요한데 토큰을 얻지 못했을 때 던지는 오류 (호출부에서 로그인 안내로 전환)
+export class AuthRequiredError extends Error {
+  constructor(message = "로그인이 필요합니다.") {
+    super(message);
+    this.name = "AuthRequiredError";
+    this.authRequired = true;
+  }
+}
 
 // 기본 사용자 정보에 브라우저에 저장된 프로필을 덮어씀
 function resolveUser(baseUser) {
@@ -33,11 +49,29 @@ function delay(data, ms = 350) {
 }
 
 async function request(path, fallback) {
-  // 실제 백엔드가 연결되지 않은 경우 목 데이터 반환
-  if (!API_BASE) {
+  const base = resolveApiBase();
+  // 실제 백엔드가 연결되지 않은 경우 목 데이터 반환 (A안 로컬/목 모드)
+  if (!base) {
     return delay(fallback);
   }
-  const res = await fetch(`${API_BASE}${path}`);
+
+  const headers = { Accept: "application/json" };
+
+  // 인증 모드: 액세스 토큰을 Authorization: Bearer 로 첨부. 토큰이 없으면 실제 요청을 막는다.
+  if (isAuthEnabled()) {
+    const token = await getAccessToken();
+    if (!token) {
+      throw new AuthRequiredError();
+    }
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${base}${path}`, { headers });
+
+  // 토큰 없음/잘못됨/만료: 오소라이저가 401/403 으로 거절 → 로그인 안내로 전환
+  if (res.status === 401 || res.status === 403) {
+    throw new AuthRequiredError("세션이 만료되었거나 접근 권한이 없습니다. 다시 로그인해 주세요.");
+  }
   if (!res.ok) {
     throw new Error(`API 요청 실패: ${res.status}`);
   }

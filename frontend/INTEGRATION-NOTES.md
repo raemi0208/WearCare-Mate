@@ -32,9 +32,13 @@ PR #8 (`frontend-api-integration` → `frontend`)의 변경 범위와 연동 시
   자격 증명은 어떤 파일에도 넣지 않습니다.
 - (정정) 이전 버전의 이 문서와 `.env.example`은 "`.env`가 루트 `.gitignore`로 제외된다"고 안내했지만
   사실이 아니었습니다. 백엔드 브랜치의 `.gitignore`를 잘못 참고한 내용입니다.
-- 공개 API(`https://j3cwx5vmwj.execute-api.ap-northeast-2.amazonaws.com`)는 **현재 예시 데이터 모드**입니다.
-  실제 Athena·AI/ML 응답은 API Gateway에 연결되지 않은 별도 테스트 함수에서만 확인했습니다.
-  프론트엔드에서 그 테스트 함수를 직접 호출하도록 바꾸지 마세요.
+- 기존 공개 API(`https://j3cwx5vmwj.execute-api.ap-northeast-2.amazonaws.com`)는 여전히 **예시 데이터 모드**이며 그대로 유지됩니다.
+- **(업데이트) HTTPS 인증 시연용 실데이터 API 가 별도로 배포 완료**되었습니다.
+  - 인증 API: `https://tirb2qdtj8.execute-api.ap-northeast-2.amazonaws.com` (JWT 오소라이저 + 스코프 `wearcare-demo/read`)
+  - 연결 Lambda `wearcare-mate-athena-test` 에 최신 집계 ZIP·권한·환경변수 반영 완료.
+  - 콘솔 `/dashboard` 응답 200, 걸음 수 12,369, 데이터셋 요약 3개 모두 `status=ok` 확인.
+  - 이 API 는 Cognito 로그인으로 얻은 액세스 토큰이 있어야 200 을 반환합니다(토큰 없음 401 / 스코프 없음 403).
+  - 상세 배포 구성·환경변수는 `WearCare-Mate-artifacts/b-cognito-deploy/README.md` 참고.
 
 ## 로그인 화면 (frontend 브랜치 `b14feb9`, PR #8 범위 밖)
 
@@ -52,12 +56,28 @@ PR #8 (`frontend-api-integration` → `frontend`)의 변경 범위와 연동 시
 - 권장 후속 작업 (프론트엔드 담당): 안내 문구 "계정 정보를 입력해 대시보드에 접속하세요"를
   "시연용 화면입니다. 실제 인증은 아직 구현되지 않았습니다." 같은 문구로 바꾸기.
 
+## 실행 모드 구분 (중요)
+
+이 프론트는 환경변수 조합으로 세 가지 모드로 동작합니다 (`src/services/authConfig.js`, `src/services/api.js` 기준).
+
+| 모드 | 조건 | 동작 |
+|---|---|---|
+| 목(mock) | `REACT_APP_API_BASE` 비어 있음 | API 호출 없이 `src/data/mockData.js` 예시 데이터 표시 |
+| 로컬 중계(비인증) | `API_BASE` 만 있고 Cognito 값 없음 | 토큰 없이 `GET {API_BASE}/dashboard`·`/ai-guide` 호출 |
+| HTTPS 인증(B안) | `API_BASE` + `COGNITO_DOMAIN` + `COGNITO_CLIENT_ID` 모두 있음 | Cognito PKCE 로그인 → 액세스 토큰 첨부 → 실데이터 조회 |
+
+- `isAuthEnabled()` 는 위 세 값이 모두 있을 때만 true. 인증 모드에서 토큰을 못 얻으면 실제 요청을 막고 로그인 안내(AuthGate)로 전환합니다.
+- **인증 설정이 비어 있다고 해서 무조건 목 데이터는 아닙니다.** `API_BASE` 만 있으면 토큰 없이 실 API 를 호출하는 로컬 중계 모드입니다.
+
 ## 실행 주소
 
-- 로컬: `http://localhost:3000/login.html` (로그인 화면), `http://localhost:3000/` (대시보드).
+- 로컬 목/중계: `http://localhost:3000/login.html` (로그인 화면), `http://localhost:3000/` (대시보드).
   프론트엔드 담당자가 공유한 로컬 개발 서버 주소입니다.
-- 배포 주소(Amplify 등): **아직 확인되지 않았습니다.** 현재 CORS에는 로컬 주소 `http://localhost:3000`만 등록되어 있으며,
-  배포 주소가 정해지면 그 Origin을 추가해야 합니다. 전체 허용(`*`)은 쓰지 않습니다.
+- HTTPS 인증 시연: `https://wearcare-mate-dxqh.vercel.app` (Cognito 로그인 → 실데이터).
+- 배포 주소(Vercel): `https://wearcare-mate-dxqh.vercel.app`.
+  - 인증 API(`tirb2qdtj8`) CORS Origin 은 `https://wearcare-mate-dxqh.vercel.app` (**끝 슬래시 없음**). 전체 허용(`*`)은 쓰지 않습니다.
+  - Cognito callback/logout URL 은 `https://wearcare-mate-dxqh.vercel.app/` (**끝 슬래시 있음**). CORS Origin 과 슬래시가 다르므로 혼동 주의.
+  - 기존 공개 API(`j3cwx5vmwj`)의 CORS 에는 로컬 `http://localhost:3000` 만 등록되어 있으며, 이 값은 로컬 중계 확인용으로 유지됩니다.
 
 ## 검증
 
