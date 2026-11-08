@@ -43,6 +43,30 @@ function resolveUser(baseUser) {
   return saved ? { ...baseUser, ...saved } : baseUser;
 }
 
+// 표시용 단위 정규화: 걸음 수 요약 카드의 단위 "보"를 "걸음"으로 표기한다.
+// (백엔드 응답은 바꾸지 않고, 프론트 표시 단계에서만 보정)
+function normalizeStepsUnit(summaryStats) {
+  if (!Array.isArray(summaryStats)) return summaryStats;
+  return summaryStats.map((s) =>
+    s && s.id === "steps" && s.unit === "보" ? { ...s, unit: "걸음" } : s
+  );
+}
+
+// 표시용 메타 정규화: 인증 모드(Cognito 로그인)로 실데이터를 조회한 경우에만
+// user.meta 의 "인증 미적용" 표기를 "Cognito 로그인 적용"으로 바꾼다.
+// - 비인증(로컬 중계/목) 모드에서는 바꾸지 않는다(실제로 인증을 적용하지 않았으므로).
+// - 그 외 메타 정보(예: "개발용 데모", "Fitbit 공개 데이터")는 그대로 유지한다.
+// - 백엔드 응답 자체는 바꾸지 않고 표시 단계에서만 치환한다.
+function normalizeAuthMeta(baseUser) {
+  if (!baseUser || typeof baseUser.meta !== "string") return baseUser;
+  if (!isAuthEnabled()) return baseUser; // 비인증 모드면 그대로
+  if (!baseUser.meta.includes("인증 미적용")) return baseUser;
+  return {
+    ...baseUser,
+    meta: baseUser.meta.replace("인증 미적용", "Cognito 로그인 적용"),
+  };
+}
+
 // 네트워크 지연을 흉내 내 로딩 상태를 확인할 수 있게 함
 function delay(data, ms = 350) {
   return new Promise((resolve) => setTimeout(() => resolve(data), ms));
@@ -92,7 +116,12 @@ export async function fetchDashboard() {
     guideHistory,
   });
   // 프로필은 DB가 아닌 브라우저 localStorage 값을 우선 반영
-  return { ...res, user: resolveUser(res.user) };
+  // 걸음 수 단위("보")는 표시용으로 "걸음"으로 정규화
+  return {
+    ...res,
+    user: normalizeAuthMeta(resolveUser(res.user)),
+    summaryStats: normalizeStepsUnit(res.summaryStats),
+  };
 }
 
 export function fetchAiGuide() {
