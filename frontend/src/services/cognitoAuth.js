@@ -82,20 +82,37 @@ function logoutEndpoint() {
 
 // ---------- 로그인 시작 (authorize 로 리다이렉트) ----------
 
-export async function login() {
+// 로그인 시작 직전 진단(민감정보 없음): 저장 성공 여부·origin·redirect_uri.
+let lastLoginStartDiagnostics = null;
+
+// 준비된(한 번 생성된) authorize URL. 진단 모드에서 "계속" 버튼이 이 동일 요청으로 이동한다.
+// state/verifier 를 다시 만들지 않도록 여기에 보관한다. (URL 원문은 외부로 노출하지 않음)
+let preparedAuthorizeUrl = null;
+
+export function getLastLoginStartDiagnostics() {
+  return lastLoginStartDiagnostics;
+}
+
+// PKCE 값을 생성·저장하고 즉시 되읽어 저장 성공을 확인한다.
+// authorize URL 을 만들어 보관하되 이동은 하지 않는다. 진단 요약(민감정보 없음)을 반환.
+export async function prepareLogin() {
   const verifier = randomString(32);
   const challenge = await sha256(verifier);
   const state = randomString(16);
 
-  sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
-  sessionStorage.setItem(PKCE_STATE_KEY, state);
-  // 진단용: 로그인을 시작한 origin(쿼리/경로 없이 origin 만)과 호출 횟수.
+  let writeVerified = false;
   try {
+    sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+    sessionStorage.setItem(PKCE_STATE_KEY, state);
     sessionStorage.setItem(START_ORIGIN_KEY, window.location.origin);
+    // 저장 직후 "즉시 되읽기"로 저장 성공을 확인한다(값 원문은 비교 결과 boolean 만 남긴다).
+    writeVerified =
+      sessionStorage.getItem(PKCE_STATE_KEY) === state &&
+      sessionStorage.getItem(PKCE_VERIFIER_KEY) === verifier;
   } catch (e) {
-    // 저장 실패해도 인증 흐름 자체는 진행
+    writeVerified = false;
   }
-  bumpCount(LOGIN_COUNT_KEY);
+  const loginCount = bumpCount(LOGIN_COUNT_KEY);
 
   const params = new URLSearchParams({
     response_type: "code",
@@ -106,7 +123,50 @@ export async function login() {
     code_challenge: challenge,
     code_challenge_method: "S256",
   });
-  window.location.assign(`${authorizeEndpoint()}?${params.toString()}`);
+  // 저장 검증 성공일 때만 authorize URL 을 보관(실패면 이동 불가하게 null 유지).
+  preparedAuthorizeUrl = writeVerified
+    ? `${authorizeEndpoint()}?${params.toString()}`
+    : null;
+
+  const redirectOrigin = (() => {
+    try {
+      return new URL(authConfig.redirectUri).origin;
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  // 민감정보 없는 진단. redirectUri 는 authorize/token 에 보내는 설정값이라 공개 가능.
+  // state/verifier/challenge/authorize URL 원문은 담지 않는다.
+  lastLoginStartDiagnostics = {
+    startOrigin: window.location.origin,
+    redirectUri: authConfig.redirectUri,
+    redirectOrigin,
+    startMatchesRedirect: redirectOrigin
+      ? window.location.origin === redirectOrigin
+      : null,
+    writeVerified,
+    loginCount,
+  };
+  return lastLoginStartDiagnostics;
+}
+
+// 준비된 동일 authorize 요청으로 이동한다. 준비가 없거나 저장 검증 실패면 이동하지 않고 false.
+export function proceedToAuthorize() {
+  if (!preparedAuthorizeUrl) return false;
+  window.location.assign(preparedAuthorizeUrl);
+  return true;
+}
+
+// 기존 즉시 이동 흐름(비진단 모드): 준비 후 바로 이동.
+export async function login() {
+  const diag = await prepareLogin();
+  if (!diag.writeVerified) {
+    const err = new Error("로그인 준비에 실패했습니다. 브라우저 저장소를 확인해 주세요.");
+    err.diagnostics = diag;
+    throw err;
+  }
+  proceedToAuthorize();
 }
 
 // ---------- 콜백 처리 (authorize → redirect_uri?code=...&state=...) ----------

@@ -45,3 +45,10 @@ export const apiBase = stripTrailingSlash(process.env.REACT_APP_API_BASE);
 export function isAuthEnabled() {
   return Boolean(authConfig.domain && authConfig.clientId && apiBase);
 }
+
+// 로그인 진단 모드. 명시적으로 REACT_APP_AUTH_DIAG=1 일 때만 켜진다.
+// 켜지면 로그인 준비와 이동을 분리해, "Cognito 로그인 계속" 버튼을 눌러야 이동한다.
+// (민감정보 없는 origin/저장 성공 여부만 화면에 표시하기 위한 모드)
+export function isAuthDiagEnabled() {
+  return clean(process.env.REACT_APP_AUTH_DIAG) === "1";
+}

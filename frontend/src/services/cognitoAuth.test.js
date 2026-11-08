@@ -6,7 +6,14 @@
 //    존재 여부/일치 여부/origin/횟수만 담는지 검증.
 // 3) 정상 흐름(같은 origin, state 일치)에서는 토큰 교환이 수행되는지 검증.
 
-import { handleRedirectCallback, getLastAuthDiagnostics } from "./cognitoAuth";
+import {
+  handleRedirectCallback,
+  getLastAuthDiagnostics,
+  login,
+  prepareLogin,
+  proceedToAuthorize,
+  getLastLoginStartDiagnostics,
+} from "./cognitoAuth";
 
 jest.mock("./authConfig", () => ({
   __esModule: true,
@@ -34,6 +41,7 @@ function setLocation(href) {
     origin: u.origin,
     pathname: u.pathname,
     search: u.search,
+    assign: jest.fn(),
   };
   // history.replaceState(cleanUrl) 호출을 무해화
   window.history.replaceState = jest.fn();
@@ -123,4 +131,101 @@ test("code 가 없으면 콜백이 아니므로 false 를 반환한다", async (
   setLocation("https://wearcare-mate-dxqh.vercel.app/");
   const result = await handleRedirectCallback();
   expect(result).toBe(false);
+});
+
+// ---------- login() 저장·write-verify 진단 ----------
+
+// jsdom 에는 crypto.subtle 이 없을 수 있어 최소 모킹을 둔다. (값은 테스트용 더미)
+function mockCrypto() {
+  global.crypto = {
+    getRandomValues: (arr) => {
+      for (let i = 0; i < arr.length; i += 1) arr[i] = (i * 7 + 3) % 256;
+      return arr;
+    },
+    subtle: {
+      digest: async () => new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]).buffer,
+    },
+  };
+  global.TextEncoder =
+    global.TextEncoder ||
+    class {
+      encode(s) {
+        return new Uint8Array([...String(s)].map((c) => c.charCodeAt(0)));
+      }
+    };
+}
+
+test("prepareLogin() 은 저장+즉시 되읽기로 writeVerified=true, 이동은 하지 않는다", async () => {
+  mockCrypto();
+  setLocation("https://wearcare-mate-dxqh.vercel.app/");
+
+  const d = await prepareLogin();
+
+  expect(d.startOrigin).toBe("https://wearcare-mate-dxqh.vercel.app");
+  expect(d.redirectUri).toBe("https://wearcare-mate-dxqh.vercel.app/");
+  expect(d.redirectOrigin).toBe("https://wearcare-mate-dxqh.vercel.app");
+  expect(d.startMatchesRedirect).toBe(true);
+  expect(d.writeVerified).toBe(true);
+  expect(d.loginCount).toBe(1);
+  // 준비만 하고 이동하지 않는다
+  expect(window.location.assign).not.toHaveBeenCalled();
+  // 저장 실제 확인
+  expect(sessionStorage.getItem(STATE_KEY)).toBeTruthy();
+  expect(sessionStorage.getItem(VERIFIER_KEY)).toBeTruthy();
+});
+
+test("proceedToAuthorize() 는 준비된 동일 요청으로 이동하며 state/verifier 를 재생성하지 않는다", async () => {
+  mockCrypto();
+  setLocation("https://wearcare-mate-dxqh.vercel.app/");
+
+  await prepareLogin();
+  const stateAfterPrepare = sessionStorage.getItem(STATE_KEY);
+  const verifierAfterPrepare = sessionStorage.getItem(VERIFIER_KEY);
+
+  const moved = proceedToAuthorize();
+  expect(moved).toBe(true);
+  expect(window.location.assign).toHaveBeenCalledTimes(1);
+  // 이동 시 state/verifier 가 바뀌지 않아야 한다(동일 요청 재사용)
+  expect(sessionStorage.getItem(STATE_KEY)).toBe(stateAfterPrepare);
+  expect(sessionStorage.getItem(VERIFIER_KEY)).toBe(verifierAfterPrepare);
+});
+
+test("저장 검증 실패면 preparedUrl 이 없어 proceedToAuthorize() 가 이동하지 않는다", async () => {
+  mockCrypto();
+  setLocation("https://wearcare-mate-dxqh.vercel.app/");
+  // setItem 을 실패시켜 writeVerified=false 유도
+  const orig = Storage.prototype.setItem;
+  Storage.prototype.setItem = jest.fn(() => {
+    throw new Error("blocked");
+  });
+
+  const d = await prepareLogin();
+  Storage.prototype.setItem = orig; // 복구
+
+  expect(d.writeVerified).toBe(false);
+  const moved = proceedToAuthorize();
+  expect(moved).toBe(false);
+  expect(window.location.assign).not.toHaveBeenCalled();
+});
+
+test("login() 기본 모드: 준비 후 즉시 이동", async () => {
+  mockCrypto();
+  setLocation("https://wearcare-mate-dxqh.vercel.app/");
+
+  await login();
+  expect(window.location.assign).toHaveBeenCalledTimes(1);
+  expect(getLastLoginStartDiagnostics().writeVerified).toBe(true);
+});
+
+test("로그인 시작 진단은 state/verifier 원문을 포함하지 않는다", async () => {
+  mockCrypto();
+  setLocation("https://wearcare-mate-dxqh.vercel.app/");
+
+  await prepareLogin();
+
+  const serialized = JSON.stringify(getLastLoginStartDiagnostics());
+  const savedState = sessionStorage.getItem(STATE_KEY);
+  const savedVerifier = sessionStorage.getItem(VERIFIER_KEY);
+  if (savedState) expect(serialized).not.toContain(savedState);
+  if (savedVerifier) expect(serialized).not.toContain(savedVerifier);
 });
