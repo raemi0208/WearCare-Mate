@@ -11,10 +11,41 @@ import { authConfig } from "./authConfig";
 const PKCE_VERIFIER_KEY = "wearcare.pkce.verifier";
 const PKCE_STATE_KEY = "wearcare.pkce.state";
 const REFRESH_KEY = "wearcare.auth.refresh";
+// 진단용: 로그인을 "시작한" origin 과 호출 횟수. 민감정보(state/verifier/code/token)는 저장하지 않는다.
+const START_ORIGIN_KEY = "wearcare.pkce.startOrigin";
+const LOGIN_COUNT_KEY = "wearcare.diag.loginCount";
+const CALLBACK_COUNT_KEY = "wearcare.diag.callbackCount";
 
 // 메모리 토큰 캐시 (새로고침되면 사라지고 refresh_token 으로 재획득)
 let accessToken = null;
 let accessTokenExpiry = 0; // epoch ms
+
+// 마지막 콜백 처리의 진단 요약(민감정보 없는 boolean/origin 만). 오류 화면 표시용.
+let lastAuthDiagnostics = null;
+
+// 안전하게 sessionStorage 숫자 카운터 증가
+function bumpCount(key) {
+  try {
+    const next = (parseInt(sessionStorage.getItem(key) || "0", 10) || 0) + 1;
+    sessionStorage.setItem(key, String(next));
+    return next;
+  } catch (e) {
+    return null;
+  }
+}
+
+function readCount(key) {
+  try {
+    return parseInt(sessionStorage.getItem(key) || "0", 10) || 0;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 민감정보가 없는 진단 요약을 반환한다. (존재 여부/일치 여부/origin/호출 횟수)
+export function getLastAuthDiagnostics() {
+  return lastAuthDiagnostics;
+}
 
 // ---------- 저수준 유틸 ----------
 
@@ -58,6 +89,13 @@ export async function login() {
 
   sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
   sessionStorage.setItem(PKCE_STATE_KEY, state);
+  // 진단용: 로그인을 시작한 origin(쿼리/경로 없이 origin 만)과 호출 횟수.
+  try {
+    sessionStorage.setItem(START_ORIGIN_KEY, window.location.origin);
+  } catch (e) {
+    // 저장 실패해도 인증 흐름 자체는 진행
+  }
+  bumpCount(LOGIN_COUNT_KEY);
 
   const params = new URLSearchParams({
     response_type: "code",
@@ -86,18 +124,53 @@ export async function handleRedirectCallback() {
   }
   if (!code) return false;
 
+  const callbackCount = bumpCount(CALLBACK_COUNT_KEY);
+
   const savedState = sessionStorage.getItem(PKCE_STATE_KEY);
   const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+  const startOrigin = (() => {
+    try {
+      return sessionStorage.getItem(START_ORIGIN_KEY);
+    } catch (e) {
+      return null;
+    }
+  })();
+  const callbackOrigin = window.location.origin;
+
+  // 검증 "전에" 민감정보 없는 진단 요약을 수집한다.
+  // 저장된 값 원문(state/verifier/code)은 담지 않고 존재 여부·일치 여부·origin·횟수만 기록한다.
+  lastAuthDiagnostics = {
+    savedStatePresent: Boolean(savedState),
+    returnedStatePresent: Boolean(returnedState),
+    stateMatches: Boolean(savedState) && savedState === returnedState,
+    verifierPresent: Boolean(verifier),
+    startOrigin: startOrigin || null,
+    callbackOrigin,
+    // 시작 origin 을 알 수 없으면(null) 불일치로 단정하지 않고 null(unknown)로 구분한다.
+    originMatches: startOrigin ? startOrigin === callbackOrigin : null,
+    loginCount: readCount(LOGIN_COUNT_KEY),
+    callbackCount,
+  };
+
   sessionStorage.removeItem(PKCE_STATE_KEY);
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+  try {
+    sessionStorage.removeItem(START_ORIGIN_KEY);
+  } catch (e) {
+    // noop
+  }
 
   if (!savedState || savedState !== returnedState) {
     cleanUrl();
-    throw new Error("로그인 상태 검증에 실패했습니다. 다시 시도해 주세요.");
+    const err = new Error("로그인 상태 검증에 실패했습니다. 다시 시도해 주세요.");
+    err.diagnostics = lastAuthDiagnostics;
+    throw err;
   }
   if (!verifier) {
     cleanUrl();
-    throw new Error("로그인 세션이 만료되었습니다. 다시 시도해 주세요.");
+    const err = new Error("로그인 세션이 만료되었습니다. 다시 시도해 주세요.");
+    err.diagnostics = lastAuthDiagnostics;
+    throw err;
   }
 
   const body = new URLSearchParams({

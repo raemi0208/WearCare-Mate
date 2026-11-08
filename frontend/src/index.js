@@ -8,6 +8,7 @@ import {
   handleRedirectCallback,
   isAuthenticated,
   login,
+  getLastAuthDiagnostics,
 } from './services/cognitoAuth';
 
 // 앱을 실제로 렌더링
@@ -20,8 +21,36 @@ function renderApp() {
   );
 }
 
+// 로그인 진단 요약을 사람이 읽을 수 있는 한 줄로 변환한다.
+// 민감정보(state/verifier/code/token)는 포함하지 않고 존재 여부·일치 여부·origin·횟수만 표시.
+function formatDiagnostics(d) {
+  if (!d) return '';
+  const yn = (v) => (v ? 'Y' : 'N');
+  // originMatch 는 3상태: true / false / null(시작 주소 확인 불가)
+  const originMatchLabel =
+    d.originMatches === null ? '시작 주소 확인 불가' : yn(d.originMatches);
+  const lines = [
+    `savedState=${yn(d.savedStatePresent)}`,
+    `returnedState=${yn(d.returnedStatePresent)}`,
+    `stateMatch=${yn(d.stateMatches)}`,
+    `verifier=${yn(d.verifierPresent)}`,
+    `originMatch=${originMatchLabel}`,
+    `login=${d.loginCount}`,
+    `callback=${d.callbackCount}`,
+  ];
+  // origin 은 쿼리/경로 없이 origin 만.
+  // 시작/콜백이 "다를 때"(false)만 두 origin 을 함께 노출. unknown(null)이면 콜백 origin 만 표시.
+  let originLine = '';
+  if (d.originMatches === false) {
+    originLine = `start=${d.startOrigin || '(none)'} / callback=${d.callbackOrigin}`;
+  } else if (d.originMatches === null) {
+    originLine = `callback=${d.callbackOrigin}`;
+  }
+  return [lines.join(' · '), originLine].filter(Boolean).join('\n');
+}
+
 // 간단한 전체 화면 메시지 (인증 처리 중/실패 시)
-function renderMessage(title, detail) {
+function renderMessage(title, detail, diagnostics) {
   const el = document.getElementById('root');
   if (!el) return;
   el.innerHTML = '';
@@ -38,6 +67,16 @@ function renderMessage(title, detail) {
   p.style.cssText = 'font-size:13px;color:#666;margin:0;';
   inner.appendChild(h);
   if (detail) inner.appendChild(p);
+  const diagText = formatDiagnostics(diagnostics);
+  if (diagText) {
+    const pre = document.createElement('pre');
+    pre.textContent = diagText;
+    pre.style.cssText =
+      'font-size:12px;color:#888;margin:16px auto 0;max-width:520px;' +
+      'white-space:pre-wrap;word-break:break-word;text-align:left;' +
+      'background:#f5f5f5;border:1px solid #e0e0e0;border-radius:6px;padding:10px 12px;';
+    inner.appendChild(pre);
+  }
   wrap.appendChild(inner);
   el.appendChild(wrap);
 }
@@ -71,9 +110,11 @@ async function cognitoGuard() {
     renderMessage('로그인 페이지로 이동 중…', '잠시만 기다려 주세요.');
     await login();
   } catch (err) {
+    const diagnostics = (err && err.diagnostics) || getLastAuthDiagnostics();
     renderMessage(
       '로그인이 필요합니다.',
-      (err && err.message) || '로그인에 실패했습니다. 다시 시도해 주세요.'
+      (err && err.message) || '로그인에 실패했습니다. 다시 시도해 주세요.',
+      diagnostics
     );
   }
 }
