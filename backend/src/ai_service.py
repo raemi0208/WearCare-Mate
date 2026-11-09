@@ -90,7 +90,9 @@ def guide_for_frontend(result):
 
 def anomalies_for_frontend(result):
     severity = {"low": "warn", "medium": "warn", "high": "danger"}
-    titles = {"ACTIVITY_DROP": "평소 대비 걸음 수 감소"}
+    titles = {"ACTIVITY_DROP": "평소 대비 걸음 수 감소", "SLEEP_SHORT": "수면 시간 부족",
+              "HRV_LOW": "심박 변이도(HRV) 감소", "STRESS_HIGH": "스트레스 수준 증가",
+              "SLEEP_RESTLESS": "수면 중 움직임 증가"}
     return [{
         "id": f"{result['date']}-{index}",
         "severity": severity[item["severity"]],
@@ -100,7 +102,8 @@ def anomalies_for_frontend(result):
         # (카드·차트·예시 데이터의 "보" 단위는 별도 범위)
         "desc": (f"기준일 걸음 수 {item['value']:,.0f}걸음 · "
                  f"과거 기록 평균 {item['baseline_mean']:,.0f}걸음")
-                 if item["type"] == "ACTIVITY_DROP" else "AI/ML 지표 판정 결과입니다.",
+                 if item["type"] == "ACTIVITY_DROP" else f"입력값 {item['value']:g} · 집단 기준 평균 {item.get('population_mean', 0):g} · 개인 진단 아님",
+        "type": item["type"], "metric": item["metric"], "basis": item["basis"],
     } for index, item in enumerate(result["anomalies"])]
 
 

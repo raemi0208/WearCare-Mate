@@ -7,12 +7,12 @@
 핵심 원칙:
     1) 기능 스위치: ENABLE_DEMO_ANOMALY=true 일 때만 동작한다(기본 비활성).
        꺼져 있으면 라우트가 없는 것처럼 404 를 돌려준다(존재를 드러내지 않음).
-    2) 입력은 서버에서 고정한다. 클라이언트 요청 본문은 읽지도, 반영하지도 않는다.
+    2) 입력값은 서버 고정 시나리오에서 선택한다. 임의의 사용자 지표는 받지 않는다.
        - user_id: test-user
        - date: 2026-11-14
        - metrics: steps=1000, tracked_minutes=800
        - history_steps: [10000, 10500, 9800, 10200, 10100, 9900]
-       - notify: false  (발표 중 SNS 발송 금지)
+       - notify: false (분석 호출에서는 SNS 발송 금지, 발송은 저장된 결과에서 별도 처리)
     3) 변환은 기존 함수를 그대로 쓴다(복제하지 않음).
        MLClient.invoke_detection -> unwrap + validate_detection_result
        ai_service.guide_for_frontend / anomalies_for_frontend -> 화면용 변환
@@ -36,7 +36,7 @@
     - history_steps 를 요청에 포함하므로 AI/ML Lambda 는 Athena 를 조회하지 않고 그 값을
       기준선으로 쓴다(명세 history_steps 규칙). 그래서 build_detection_request() 대신
       이 모듈에서 요청을 직접 조립한다(build_detection_request 는 history_steps 를 보내지 않음).
-    - notify=False 를 요청 최상위에 고정해 SNS 발송을 막는다.
+    - 분석 호출은 notify=False 고정. 발송 시연은 history_service 에서 저장 결과를 사용한다.
 """
 
 import os
@@ -72,21 +72,35 @@ def is_demo_anomaly_enabled(environ=None):
     return isinstance(value, str) and value.strip().lower() == _ENABLED_VALUE
 
 
-def build_demo_request():
+SCENARIOS = {
+    "steps": ("걸음 수 감소", {}),
+    "sleep": ("수면 부족", {"sleep_hours": 3.0}),
+    "hrv": ("HRV 감소", {"heart_rate_variability": 15.0}),
+    "stress": ("스트레스 증가", {"stress_level": 10.0}),
+    "multi": ("다중 지표", {"sleep_hours": 3.0, "heart_rate_variability": 15.0, "stress_level": 10.0}),
+}
+
+
+def build_demo_request(scenario="steps"):
     """서버가 보낼 고정 가상 요청의 복사본을 만든다. (DEMO_REQUEST 원본 보호)
 
     중첩된 metrics·history_steps 까지 새 객체로 복사해, 호출하는 쪽이 바꿔도 원본이 변하지 않게 한다.
     """
+    if scenario not in SCENARIOS:
+        raise ValueError("지원하지 않는 시나리오입니다.")
+    metrics = dict(DEMO_REQUEST["metrics"])
+    if scenario != "steps":
+        metrics["steps"] = 10000
+    metrics.update(SCENARIOS[scenario][1])
     return {
-        "user_id": DEMO_REQUEST["user_id"],
-        "date": DEMO_REQUEST["date"],
-        "metrics": dict(DEMO_REQUEST["metrics"]),
-        "history_steps": list(DEMO_REQUEST["history_steps"]),
-        "notify": DEMO_REQUEST["notify"],
+        "user_id": DEMO_REQUEST["user_id"], "date": DEMO_REQUEST["date"],
+        "metrics": metrics, "history_steps": list(DEMO_REQUEST["history_steps"]),
+        "notify": False,
     }
 
 
-def run_demo_anomaly(lambda_client_factory=None, environ=None):
+
+def run_demo_anomaly(lambda_client_factory=None, environ=None, scenario="steps"):
     """고정 가상 입력으로 실제 AI/ML 을 호출하고 화면용 변환까지 수행한다.
 
     Args:
@@ -113,7 +127,9 @@ def run_demo_anomaly(lambda_client_factory=None, environ=None):
             "message": "요청하신 기능을 사용할 수 없습니다.",
         }
 
-    request = build_demo_request()
+    if scenario not in SCENARIOS:
+        return {"statusCode": 400, "error": "invalid_scenario"}
+    request = build_demo_request(scenario)
 
     # 1) 설정 → 클라이언트 생성
     factory = lambda_client_factory or create_lambda_client
@@ -137,6 +153,7 @@ def run_demo_anomaly(lambda_client_factory=None, environ=None):
         "statusCode": 200,
         "inputKind": INPUT_KIND,
         "referenceDate": result["date"],
+        "scenario": scenario, "scenarioLabel": SCENARIOS[scenario][0],
         "analysisStatus": result["status"],
         "overallSeverity": result["overall_severity"],
         "aiGuide": screen_guide,

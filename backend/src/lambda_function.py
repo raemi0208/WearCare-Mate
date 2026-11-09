@@ -21,6 +21,7 @@ from src.data_source import (
     select_health_data_builder,
 )
 from src.demo_anomaly import is_demo_anomaly_enabled
+from src.history_service import HistoryError
 from src.mock_data import (
     build_anomalies_mock,
     build_guides_mock,
@@ -252,7 +253,8 @@ def _route_request(event):
     if method == "GET" and path == "/dashboard":
         if get_ai_source_name() == "real":
             from src.ai_service import build_ai_dashboard
-            return _build_response(200, build_ai_dashboard())
+            from src.history_service import attach_history
+            return _build_response(200, attach_history(build_ai_dashboard(), event))
         ensure_ai_source_is_mock()
         builder = select_dashboard_builder(build_dashboard_mock)
         return _build_response(200, builder())
@@ -263,23 +265,29 @@ def _route_request(event):
     if method == "GET" and path == "/ai-guide":
         if get_ai_source_name() == "real":
             from src.ai_service import build_ai_guide
-            return _build_response(200, build_ai_guide())
+            from src.history_service import attach_guide
+            return _build_response(200, attach_guide(build_ai_guide(), event))
         ensure_ai_source_is_mock()
         return _build_response(200, build_ai_guide_mock())
 
     # 2-3) POST /demo/anomaly (발표용 가상 이상 시연)
     #      ⚠️ ENABLE_DEMO_ANOMALY=true 일 때만 동작한다(기본 비활성).
     #         꺼져 있으면 아래 라우트 매칭에서 제외되어, 그 외 경로와 같이 404 로 처리된다.
-    #      서버가 입력을 고정하므로 클라이언트 요청 본문은 읽지 않는다.
+    #      클라이언트는 서버 고정 시나리오 또는 저장된 결과의 발송 작업만 선택한다.
     #      실제 AI/ML 을 호출하며, 실패해도 예시 가이드로 대체하지 않는다.
     if method == "POST" and path == "/demo/anomaly" and is_demo_anomaly_enabled():
         from src.demo_anomaly import run_demo_anomaly
 
-        result = run_demo_anomaly()
+        from src.history_service import enabled, handle_demo
+        result = handle_demo(event) if enabled() else run_demo_anomaly()
         # run_demo_anomaly 는 statusCode 와 본문을 한 dict 에 담아 돌려준다.
         # API Gateway 응답으로 바꾸기 위해 statusCode 를 분리한다.
         status_code = result.pop("statusCode", 200)
         return _build_response(status_code, result)
+
+    if method == "GET" and path == "/history":
+        from src.history_service import read_history
+        return _build_response(200, read_history(event))
 
     # 3) GET /users/{userId}/health-data
     #    DATA_SOURCE 설정으로 빌더를 고른다. 기본값(mock)이면 기존 MOCK 빌더를 쓴다.
@@ -346,6 +354,8 @@ def lambda_handler(event, context):
     """
     try:
         return _route_request(event)
+    except HistoryError as error:
+        return _build_response(error.status, {"error": error.code})
     except DataSourceUnavailableError as error:
         # 데이터 소스를 사용할 수 없는 경우만 503 으로 바꾼다. (내부 정보 비노출)
         logger.error("Data source unavailable: %s", type(error).__name__)
