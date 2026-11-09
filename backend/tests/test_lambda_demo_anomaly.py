@@ -66,7 +66,7 @@ class DemoAnomalyEnabledTest(unittest.TestCase):
 
     def test_success_is_converted_to_api_response(self):
         fake_result = {
-            "statusCode": 200, "inputKind": "virtual", "referenceDate": "2026-10-30",
+            "statusCode": 200, "inputKind": "virtual", "referenceDate": "2026-11-14",
             "analysisStatus": "anomaly", "overallSeverity": "high",
             "aiGuide": {"status": "generated"}, "anomalies": [{"severity": "danger"}],
             "request": {"notify": False},

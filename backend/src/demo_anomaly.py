@@ -9,7 +9,7 @@
        꺼져 있으면 라우트가 없는 것처럼 404 를 돌려준다(존재를 드러내지 않음).
     2) 입력은 서버에서 고정한다. 클라이언트 요청 본문은 읽지도, 반영하지도 않는다.
        - user_id: test-user
-       - date: 2026-10-30
+       - date: 2026-11-14
        - metrics: steps=1000, tracked_minutes=800
        - history_steps: [10000, 10500, 9800, 10200, 10100, 9900]
        - notify: false  (발표 중 SNS 발송 금지)
@@ -22,7 +22,7 @@
 응답(성공):
     {
       "inputKind": "virtual",
-      "referenceDate": "2026-10-30",
+      "referenceDate": "2026-11-14",
       "analysisStatus": "...",
       "overallSeverity": "...",
       "aiGuide": {...},        # guide_for_frontend 결과
@@ -54,7 +54,7 @@ _ENABLED_VALUE = "true"
 # 필드 이름·형식은 AI/ML lambda_handler 기준(ml_virtual_anomaly_check.VIRTUAL_REQUEST 와 동일 값).
 DEMO_REQUEST = {
     "user_id": "test-user",
-    "date": "2026-10-30",
+    "date": "2026-11-14",
     "metrics": {"steps": 1000, "tracked_minutes": 800},
     "history_steps": [10000, 10500, 9800, 10200, 10100, 9900],
     "notify": False,

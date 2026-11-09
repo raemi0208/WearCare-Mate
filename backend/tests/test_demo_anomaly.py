@@ -34,7 +34,7 @@ ENV_ON = {
 def anomaly_body(guide="default", warnings=None):
     """AI/ML v0.3 출력 구조의 anomaly 응답 body(고정 가상 입력에 대응)."""
     body = {
-        "user_id": "test-user", "date": "2026-10-30",
+        "user_id": "test-user", "date": "2026-11-14",
         "anomalies": [{
             "type": "ACTIVITY_DROP", "basis": "personal", "metric": "steps", "value": 1000,
             "baseline_mean": 10083, "baseline_std": 250, "z_score": -18.17,
@@ -49,7 +49,7 @@ def anomaly_body(guide="default", warnings=None):
                       "증상이 지속되거나 불편하면 전문가와 상담해보세요."],
             "model_id": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
             "warnings": warnings or [],
-            "generated_at": "2026-10-30T14:40:09+09:00",
+            "generated_at": "2026-11-14T14:40:09+09:00",
         },
         "model_version": "activity-zscore-v0.2+pop-v0.3",
         "overall_severity": "high", "status": "anomaly",
@@ -60,7 +60,7 @@ def anomaly_body(guide="default", warnings=None):
 
 
 def normal_body():
-    return {"user_id": "test-user", "date": "2026-10-30", "anomalies": [],
+    return {"user_id": "test-user", "date": "2026-11-14", "anomalies": [],
             "anomaly_score": None, "guide": None,
             "model_version": "activity-zscore-v0.2+pop-v0.3",
             "overall_severity": "none", "status": "normal"}
@@ -132,7 +132,7 @@ class FixedInputTest(unittest.TestCase):
         payload = json.loads(fake.calls[0]["Payload"].decode("utf-8"))
         self.assertEqual(payload, {
             "user_id": "test-user",
-            "date": "2026-10-30",
+            "date": "2026-11-14",
             "metrics": {"steps": 1000, "tracked_minutes": 800},
             "history_steps": [10000, 10500, 9800, 10200, 10100, 9900],
             "notify": False,
@@ -164,7 +164,7 @@ class SuccessResponseTest(unittest.TestCase):
         result = run(FakeLambda(body=anomaly_body()))
         self.assertEqual(result["statusCode"], 200)
         self.assertEqual(result["inputKind"], "virtual")
-        self.assertEqual(result["referenceDate"], "2026-10-30")
+        self.assertEqual(result["referenceDate"], "2026-11-14")
         self.assertEqual(result["analysisStatus"], "anomaly")
         self.assertEqual(result["overallSeverity"], "high")
         self.assertIn("aiGuide", result)
