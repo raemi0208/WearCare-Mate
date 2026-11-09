@@ -8,7 +8,7 @@ export default function SleepStages({ sleepStages }) {
   if (segments.length === 0) {
     return (
       <Card title="수면 단계 분석" action={<Badge variant="ghost">정보 미제공</Badge>}>
-        <p role="status">현재 데이터셋은 수면 단계 정보를 제공하지 않습니다.</p>
+        <p className="ui-note" role="status">현재 데이터셋은 수면 단계 정보를 제공하지 않습니다.</p>
       </Card>
     );
   }

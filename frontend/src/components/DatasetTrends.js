@@ -90,7 +90,7 @@ function SleepDistribution({ sleepSummary }) {
   if (msg) {
     return (
       <Card title="수면 시간 분포" action={datasetBadge}>
-        <p role="status">{msg}</p>
+        <p className="ui-note" role="status">{msg}</p>
         <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
           {DATASET_DESC}
         </p>
@@ -103,7 +103,7 @@ function SleepDistribution({ sleepSummary }) {
   if (!Array.isArray(distribution)) {
     return (
       <Card title="수면 시간 분포" action={datasetBadge}>
-        <p role="status">확장 집계가 제공되지 않았습니다.</p>
+        <p className="ui-note" role="status">확장 집계가 제공되지 않았습니다.</p>
         <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
           {DATASET_DESC}
         </p>
@@ -207,7 +207,7 @@ function HeartDaily({ heartSummary }) {
   if (msg) {
     return (
       <Card title="날짜별 평균 심박" action={datasetBadge}>
-        <p role="status">{msg}</p>
+        <p className="ui-note" role="status">{msg}</p>
         <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
           {DATASET_DESC}
         </p>
@@ -219,7 +219,7 @@ function HeartDaily({ heartSummary }) {
   if (!Array.isArray(dailySeries)) {
     return (
       <Card title="날짜별 평균 심박" action={datasetBadge}>
-        <p role="status">확장 집계가 제공되지 않았습니다.</p>
+        <p className="ui-note" role="status">확장 집계가 제공되지 않았습니다.</p>
         <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
           {DATASET_DESC}
         </p>
@@ -341,7 +341,7 @@ export default function DatasetTrends({ sleepSummary, heartSummary }) {
       <HeartDaily heartSummary={heartSummary} />
 
       <Card title="수면 단계 분석" action={datasetBadge}>
-        <p role="status">현재 데이터셋은 수면 단계 정보를 제공하지 않습니다.</p>
+        <p className="ui-note" role="status">현재 데이터셋은 수면 단계 정보를 제공하지 않습니다.</p>
       </Card>
     </div>
   );

@@ -21,7 +21,7 @@ export default function DemoAnomalyPanel({ onRun, onReset, loading = false, acti
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h3 className="card__title" style={{ margin: 0 }}>가상 이상 시연</h3>
-          <p style={{ margin: "6px 0 0", color: "var(--color-muted)", fontSize: 13 }}>
+          <p className="ui-note" style={{ margin: "6px 0 0" }}>
             가상 입력 · 실제 AI 생성 · 실제 사용자 기록 아님
           </p>
         </div>
@@ -50,8 +50,8 @@ export default function DemoAnomalyPanel({ onRun, onReset, loading = false, acti
       </div>
 
       {active && !error && (
-        <p role="status" style={{ margin: "12px 0 0", color: "var(--color-muted)", fontSize: 13 }}>
-          아래 이상 탐지와 AI 가이드는 <strong>가상 입력에 대한 실제 AI 생성 결과</strong>입니다.
+        <p className="ui-note" role="status" style={{ margin: "12px 0 0" }}>
+          아래 이상 탐지와 AI 가이드는 가상 입력에 대한 실제 AI 생성 결과입니다.
           실제 사용자 기록이 아니며, 다른 대시보드 카드는 실제 데이터 그대로입니다.
         </p>
       )}

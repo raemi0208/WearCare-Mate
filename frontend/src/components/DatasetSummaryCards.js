@@ -44,7 +44,7 @@ function CardShell({ title, summary, children }) {
         <Badge label={summary && summary.sourceLabel} />
       </div>
       {note ? (
-        <p style={{ color: "var(--color-muted)", margin: 0 }}>{note}</p>
+        <p className="ui-note" style={{ margin: 0 }}>{note}</p>
       ) : (
         children
       )}

@@ -15,7 +15,7 @@ export default function AnomalyPanel({ anomalies = [], embedded = false, analysi
 
   const list = (
     <div className="anomaly-list">
-      {anomalies.length === 0 && <p>{analysis?.status === "insufficient_data"
+      {anomalies.length === 0 && <p className="ui-note">{analysis?.status === "insufficient_data"
         ? "판정할 과거 기록이 부족합니다." : analysis?.status === "normal"
         ? "기준일 걸음 수에서 이상 감소가 감지되지 않았습니다."
         : "표시할 이상 탐지 내역이 없습니다."}</p>}

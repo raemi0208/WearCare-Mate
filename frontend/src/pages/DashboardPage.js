@@ -19,7 +19,7 @@ export default function DashboardPage({ data, onRegenerate, regenerating, demoAc
       {data.analysis && (
         <div className="card" style={{ padding: 16 }}>
           <p>분석 기준일: {displayReferenceDate}</p>
-          <p>{demoActive ? "가상 시연 입력에 대한 이상 탐지 결과입니다." : data.analysis.note}</p>
+          <p className="ui-note">{demoActive ? "가상 시연 입력에 대한 이상 탐지 결과입니다." : data.analysis.note}</p>
         </div>
       )}
       <div className="grid grid--stats">

@@ -942,3 +942,11 @@
   color: var(--color-muted);
   margin-left: 2px;
 }
+/* 카드 본문의 보조 설명은 부제목과 같은 크기와 색상으로 표시한다. */
+.ui-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-muted);
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
