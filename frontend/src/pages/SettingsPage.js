@@ -46,7 +46,8 @@ export default function SettingsPage({ user, onProfileSaved }) {
 
   return (
     <div className="grid grid--main">
-      <Card title="프로필 정보" subtitle="내 건강 프로필을 수정합니다">
+      <Card title="프로필 정보" subtitle="이 브라우저에 저장되는 표시용 프로필입니다">
+        <p>이 정보는 현재 AI 분석에 사용되지 않으며, 다른 브라우저나 기기와 공유되지 않습니다.</p>
         <form className="form" onSubmit={handleSubmit}>
           <div className="form__row">
             <label className="form__field">
@@ -135,7 +136,8 @@ export default function SettingsPage({ user, onProfileSaved }) {
         </form>
       </Card>
 
-      <Card title="알림 설정" subtitle="Amazon SNS 푸시 알림">
+      <Card title="알림 설정" subtitle="시연용 알림 선호 설정">
+        <p>변경 사항 저장을 누르면 이 브라우저에만 저장됩니다. 실제 SNS 이메일 수신 설정에는 반영되지 않으며, 웹 가상 시연에서는 이메일을 발송하지 않습니다.</p>
         <div className="toggle-list">
           <label className="toggle-item">
             <span>

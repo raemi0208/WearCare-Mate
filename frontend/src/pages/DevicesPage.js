@@ -92,9 +92,9 @@ export default function DevicesPage({ data }) {
         </Card>
       )}
 
-      <Card title="새 기기 추가" subtitle="지원되는 웨어러블 기기를 연결하세요">
-        <button type="button" className="add-device-btn">
-          + 기기 연결하기
+      <Card title="새 기기 추가" subtitle="실제 웨어러블 기기 연결 기능은 준비 중입니다">
+        <button type="button" className="add-device-btn" disabled style={{ cursor: "not-allowed", opacity: 0.6 }}>
+          기기 연결하기 · 준비 중
         </button>
       </Card>
     </div>
