@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BACKEND_DIR not in sys.path:
@@ -242,6 +243,71 @@ class RealDashboardErrorTest(RealDashboardTestCase):
         self.enable_real(ATHENA_MAX_ROWS="4")
         self.use_fake_client(FakeAthenaClient(pages=pages(*THIS_WEEK_ROWS[:3])))
         self.assertEqual(self.get_dashboard()["statusCode"], 200)
+
+
+class RealDashboardDatasetSummaryTest(RealDashboardTestCase):
+    """ENABLE_DATASET_SUMMARY=true 일 때 /dashboard 에 세 데이터셋 요약이 추가되는지."""
+
+    def setUp(self):
+        super().setUp()
+        self.enable_real(ENABLE_DATASET_SUMMARY="true")
+
+    def _summary_client(self, responses, fail_on_substring=None):
+        """dataset_summary.create_athena_client 를 가짜로 바꾼다(집계 전용)."""
+        from tests.test_dataset_summary import FakeSummaryClient
+        import src.dataset_summary as ds
+        client = FakeSummaryClient(responses, fail_on_substring=fail_on_substring)
+        patcher = mock.patch.object(ds, "create_athena_client", lambda region: client)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return client
+
+    def test_three_dataset_summaries_added_with_real_aggregates(self):
+        from tests.test_dataset_summary import ok_responses
+        self._summary_client(ok_responses())
+        # 지난주 행도 함께 주어 delta 가 number 로 나오게 한다(스키마 검증 통과).
+        self.use_fake_client(FakeAthenaClient(pages=pages(*THIS_WEEK_ROWS, *LAST_WEEK_ROWS)))
+        body = self.body_of(self.get_dashboard())
+        self.assert_dashboard_schema(body)
+        # 걸음 수(기존)는 그대로 유지
+        self.assertEqual(body["summaryStats"][0]["value"], "3,000")
+        # 세 요약 필드 추가
+        self.assertEqual(body["sleepDatasetSummary"]["recordCount"], 1000)
+        self.assertEqual(body["sleepDatasetSummary"]["averageHours"], 7.47)
+        self.assertEqual(body["sleepDatasetSummary"]["sourceLabel"], "별도 데이터셋")
+        # Shared fixture uses local test values, not Athena measurements.
+        self.assertEqual(body["heartRateDatasetSummary"]["totalRows"], 1616)
+        self.assertEqual(body["heartRateDatasetSummary"]["positiveRows"], 1610)
+        self.assertEqual(sum(d["includedRows"] for d in body["heartRateDatasetSummary"]["dailySeries"]), 1610)
+        files = {f["id"]: f["rowCount"] for f in body["psychologyDatasetSummary"]["files"]}
+        self.assertEqual(files, {"integrated": 1328, "validation": 175})
+
+    def test_summary_failure_does_not_break_steps_or_guide(self):
+        """심박 집계만 실패해도 걸음 수·AI 가이드·다른 집계는 그대로."""
+        from tests.test_dataset_summary import SLEEP_COLS, SLEEP_OK_VALUES, PSY_COLS, result_page
+        responses = [
+            result_page(SLEEP_COLS, SLEEP_OK_VALUES),
+            result_page(PSY_COLS, ["1328"]),
+            result_page(PSY_COLS, ["175"]),
+        ]
+        self._summary_client(responses, fail_on_substring="heart_rate_table")
+        self.use_fake_client(FakeAthenaClient(pages=pages(*THIS_WEEK_ROWS)))
+        response = self.get_dashboard()
+        self.assertEqual(response["statusCode"], 200)
+        body = self.body_of(response)
+        self.assertEqual(body["summaryStats"][0]["value"], "3,000")  # 걸음 수 보존
+        self.assertEqual(body["sleepDatasetSummary"]["status"], "ok")
+        self.assertEqual(body["heartRateDatasetSummary"]["status"], "error")
+        self.assertIsNone(body["heartRateDatasetSummary"]["totalRows"])  # 0 이 아니라 None
+        self.assertEqual(body["psychologyDatasetSummary"]["status"], "ok")
+
+    def test_summary_off_keeps_dashboard_without_new_fields(self):
+        """스위치 꺼짐이면 세 필드가 없어야 한다(기존 응답 유지)."""
+        self.enable_real(ENABLE_DATASET_SUMMARY=None)
+        self.use_fake_client(FakeAthenaClient(pages=pages(*THIS_WEEK_ROWS)))
+        body = self.body_of(self.get_dashboard())
+        for key in ("sleepDatasetSummary", "heartRateDatasetSummary", "psychologyDatasetSummary"):
+            self.assertNotIn(key, body)
 
 
 class RealDashboardRegressionTest(RealDashboardTestCase):

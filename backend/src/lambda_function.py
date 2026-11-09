@@ -20,6 +20,7 @@ from src.data_source import (
     select_dashboard_builder,
     select_health_data_builder,
 )
+from src.demo_anomaly import is_demo_anomaly_enabled
 from src.mock_data import (
     build_anomalies_mock,
     build_guides_mock,
@@ -222,6 +223,7 @@ def _route_request(event):
     1) 이벤트에서 메서드/경로를 꺼낸다. 실패하면 400.
     2) GET /health 면 200 과 상태 JSON 을 반환한다.
        GET /dashboard, GET /ai-guide 면 예시(MOCK) 대시보드/가이드를 반환한다.
+       POST /demo/anomaly 는 ENABLE_DEMO_ANOMALY=true 일 때만 발표용 가상 이상 시연을 수행한다.
     3) GET /users/{userId}/health-data 면 가상(MOCK) 건강 데이터를 반환한다.
     4) GET /users/{userId}/anomalies 면 가상(MOCK) 이상탐지 결과를 반환한다.
     5) GET /users/{userId}/guides 면 가상(MOCK) 건강 행동 가이드를 반환한다.
@@ -264,6 +266,20 @@ def _route_request(event):
             return _build_response(200, build_ai_guide())
         ensure_ai_source_is_mock()
         return _build_response(200, build_ai_guide_mock())
+
+    # 2-3) POST /demo/anomaly (발표용 가상 이상 시연)
+    #      ⚠️ ENABLE_DEMO_ANOMALY=true 일 때만 동작한다(기본 비활성).
+    #         꺼져 있으면 아래 라우트 매칭에서 제외되어, 그 외 경로와 같이 404 로 처리된다.
+    #      서버가 입력을 고정하므로 클라이언트 요청 본문은 읽지 않는다.
+    #      실제 AI/ML 을 호출하며, 실패해도 예시 가이드로 대체하지 않는다.
+    if method == "POST" and path == "/demo/anomaly" and is_demo_anomaly_enabled():
+        from src.demo_anomaly import run_demo_anomaly
+
+        result = run_demo_anomaly()
+        # run_demo_anomaly 는 statusCode 와 본문을 한 dict 에 담아 돌려준다.
+        # API Gateway 응답으로 바꾸기 위해 statusCode 를 분리한다.
+        status_code = result.pop("statusCode", 200)
+        return _build_response(status_code, result)
 
     # 3) GET /users/{userId}/health-data
     #    DATA_SOURCE 설정으로 빌더를 고른다. 기본값(mock)이면 기존 MOCK 빌더를 쓴다.

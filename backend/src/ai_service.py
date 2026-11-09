@@ -109,11 +109,15 @@ def build_ai_guide(environ=None, athena_client_factory=None, ml_client_factory=N
     return guide_for_frontend(result)
 
 
-def build_ai_dashboard(environ=None, athena_client_factory=None, ml_client_factory=None):
+def build_ai_dashboard(environ=None, athena_client_factory=None, ml_client_factory=None,
+                       summary_client_factory=None):
     items, result, env = _load_result(environ, athena_client_factory, ml_client_factory)
     # Keep dashboard statistics in the target day's week, excluding later records.
     items = [item for item in items if item["date"] <= result["date"]]
-    body = build_real_dashboard(environ=env, activity_items=items)
+    # 데이터셋 요약 집계는 build_real_dashboard 안에서 ENABLE_DATASET_SUMMARY=true 일 때만 수행된다.
+    # /ai-guide(build_ai_guide)는 build_real_dashboard 를 호출하지 않으므로 집계가 실행되지 않는다.
+    body = build_real_dashboard(environ=env, activity_items=items,
+                                summary_client_factory=summary_client_factory)
     stats = compute_weekly_steps(items)
     card = build_steps_summary_card(stats)
     body["summaryStats"] = [card] if card else []

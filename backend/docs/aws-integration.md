@@ -189,10 +189,13 @@ Lambda·Athena·AI/ML 을 호출해 얻은 결과입니다. 공개 API·Vercel �
 - **로컬 브라우저 검증 (완료)**: 발표 PC에서 로컬 중계 서버(`wearcare-test` 프로필)를 통해 공개 대시보드
   프론트엔드를 실제 Athena 데이터에 연결해 확인했습니다. 주간 평균 `12,369보`, 기준주 4/10 시계열,
   `/ai-guide` 정상 판정·`alertSent=false`를 브라우저에서 확인했습니다. 발표 시연은 이 로컬 중계 경로를 사용합니다.
-- **Vercel 배포 상태 (미연결, 변경 없음)**: 발표용 Vercel 배포본(`https://wearcare-mate-dxqh.vercel.app`)은
-  빌드에 `REACT_APP_API_BASE`가 없어 **목(mock) 데이터 모드**로 동작합니다. HTTPS 공개본을 실데이터에
-  연결하려면 신규 인증 수단(Cognito+JWT 오소라이저 또는 인증을 붙인 공개 중계)이 필요하며, 이번 작업에서는
-  AWS·Vercel 설정을 변경하지 않았습니다. 공개 API(`j3cwx5vmwj`)도 목 모드를 유지합니다.
+- **Vercel 배포 상태 (이후 인증 연결 완료 — 아래 정정 참고)**: 이 항목은 당시 기록입니다. 당시에는 발표용
+  Vercel 배포본(`https://wearcare-mate-dxqh.vercel.app`)이 `REACT_APP_API_BASE` 없이 목(mock) 모드였습니다.
+  > **정정(현재 확정 상태)**: 이후 **인증된 발표 API `https://tirb2qdtj8.execute-api.ap-northeast-2.amazonaws.com`가
+  > 배포 완료**되었습니다. 이 API의 `GET /dashboard`·`GET /ai-guide`는 **Cognito JWT 오소라이저 + 스코프
+  > `wearcare-demo/read`**로 보호되며, 연결 Lambda는 `wearcare-mate-athena-test`입니다. 발표본은 이 API로
+  > Cognito 로그인 → 액세스 토큰 첨부 → 실데이터 조회를 하며, 로그인·로그아웃·재로그인과 실제 Athena 데이터
+  > 표시가 이미 검증되었습니다. 기존 공개 예시 API(`j3cwx5vmwj`)는 **그대로 보존**(예시 모드)합니다.
 
 ## 비공개 AWS 연동 검증 준비 (실행 전, 승인 필요)
 
@@ -403,3 +406,99 @@ GET 재조회도 Athena와 Bedrock 비용이 발생할 수 있으며 생성 캐�
 - detector.py의 걸음 수 단위를 보 -> 걸음으로 바꾸어 wearcare-mate-ml에 직접 배포했다고 공유받았습니다.
 - 입출력 형식과 환경변수 변경 없음, timeout 1분 유지라는 공유 기준이며 이 백엔드 작업에서
   해당 배포를 다시 수행하지 않았습니다. AI/ML 원본은 별도 브랜치에서 관리합니다.
+
+## 웹 가상 이상 시연 (POST /demo/anomaly, 백엔드 로컬 구현 · 아직 미배포)
+
+발표 화면에서 "가상 이상 입력 → 실제 AI/ML → 화면 변환"을 버튼 한 번으로 보여 주기 위한 공개 라우트입니다.
+콘솔 전용 도구(`src.ml_virtual_anomaly_check`)는 API Gateway 이벤트를 `REFUSED`로 거절하므로 그대로 두고,
+웹 경로용으로 `src/demo_anomaly.py`를 새로 만들어 `src.lambda_function` 라우터에 연결했습니다.
+이번 변경은 로컬 코드·테스트만 완료했고 AWS·Vercel·실제 ML 호출은 하지 않았습니다.
+
+### 동작 요약
+
+- **라우트**: `POST /demo/anomaly` (`src.lambda_function._route_request` 2-3 분기).
+- **기능 스위치(기본 비활성)**: `ENABLE_DEMO_ANOMALY=true` 일 때만 동작합니다. 꺼져 있으면 라우트 매칭에서
+  빠져 그 외 경로와 같이 **404**(존재를 드러내지 않음). `GET /demo/anomaly`는 스위치와 무관하게 404입니다.
+- **서버 고정 입력(클라이언트가 못 바꿈)**: 요청 본문을 읽지 않습니다. `src.demo_anomaly.DEMO_REQUEST` 고정.
+  ```json
+  { "user_id": "test-user", "date": "2026-10-30",
+    "metrics": { "steps": 1000, "tracked_minutes": 800 },
+    "history_steps": [10000, 10500, 9800, 10200, 10100, 9900], "notify": false }
+  ```
+  `history_steps`가 있어 AI/ML Lambda는 Athena를 조회하지 않고 그 값을 기준선으로 씁니다.
+  `notify: false`를 요청 최상위에 고정해 SNS 발송을 막습니다(발표 중 알림 금지).
+- **재사용**: 기존 `MLClient.invoke_detection`(unwrap + `validate_detection_result`)와
+  `ai_service.guide_for_frontend` / `anomalies_for_frontend`를 그대로 씁니다(변환 로직 복제 없음).
+- **성공 응답(200)**: `inputKind: "virtual"`, `referenceDate`, `analysisStatus`, `overallSeverity`,
+  `aiGuide`(= `guide_for_frontend`), `anomalies`(= `anomalies_for_frontend`), 서버가 보낸 `request`.
+- **실패 시 예시 대체 없음**: 설정·boto3 오류는 503(stage=config), 호출·응답 검증 실패는 502
+  (stage=invoke_or_validate). 예외 원문 메시지는 응답에 넣지 않고 타입 이름만 담습니다.
+
+### 테스트 (실제 AWS 미접속, 가짜 Lambda 주입)
+
+- `tests/test_demo_anomaly.py`: 스위치 기본 비활성, 고정 입력·`notify=false` 전달, 성공 응답의
+  aiGuide/anomalies/inputKind, 설정·호출·응답 실패 처리(예시 대체 없음)를 검증합니다.
+- `tests/test_lambda_demo_anomaly.py`: 라우팅 레벨에서 비활성 404(ML 미호출), 활성 시 상태 코드·본문 변환,
+  기존 GET 경로(/health·/dashboard·/ai-guide·/users/...) 보존을 검증합니다.
+- 전체 스위트(`py -m unittest discover -s tests`) 473건 통과. 기존 테스트 변경 없음.
+
+### 배포 절차 (승인 후 실행 — 인증된 발표 API `tirb2qdtj8`에만 추가)
+
+**어느 API에 추가하는가 (정정)**: `POST /demo/anomaly`는 **인증된 발표 API
+`https://tirb2qdtj8.execute-api.ap-northeast-2.amazonaws.com`에만** 추가합니다. 이 API는 이미 Cognito JWT
+오소라이저 + 스코프 `wearcare-demo/read`로 보호되고, 연결 Lambda는 `wearcare-mate-athena-test`입니다.
+**기존 공개 예시 API `j3cwx5vmwj`에는 추가하지 않습니다**(예시 모드 그대로 보존). 즉 JWT 보호를 새로
+"세우는" 것이 아니라, **이미 보호된 API에 보호된 라우트 하나를 추가**하는 작업입니다.
+
+> ⚠️ 연결 Lambda 구분: 발표 API는 `wearcare-mate-athena-test`에 연결되어 있습니다. 이 데모 라우트의 진입점은
+> `src.lambda_function.lambda_handler`입니다. `wearcare-mate-athena-test`가 이 핸들러로 라우팅되는지 먼저
+> 확인하세요. 아니라면 해당 Lambda의 배포 ZIP·핸들러에 이번 변경(`src/demo_anomaly.py` + 라우터 분기)이
+> 포함되도록 반영해야 합니다.
+
+1. **패키징**: 최상위에 `src/`가 들어가도록 ZIP(이번 수정본 포함). `backend/`나 `.venv`를 통째로 넣지 않습니다.
+   진입점은 `src.lambda_function.lambda_handler` 그대로입니다. 발표 API 연결 Lambda(`wearcare-mate-athena-test`)에 배포합니다.
+2. **새 POST 라우트에 JWT·scope 적용**: `POST /demo/anomaly` 라우트를 추가하고, 기존 `GET /dashboard`·
+   `GET /ai-guide`와 **동일한 JWT 오소라이저**를 지정합니다.
+   - issuer/audience는 기존 두 GET 라우트와 같은 값(이미 운영 중인 Cognito User Pool·앱 클라이언트)을 씁니다.
+   - 스코프: 기존 `wearcare-demo/read`를 그대로 쓸지 검토합니다. 아래 "스코프 검토" 참고.
+   - 토큰 없는 호출은 401, 스코프 부족은 403이어야 합니다(기존 GET과 동일 동작).
+3. **CORS에 POST 허용**: 발표 API의 CORS에 `POST` 메서드와 `Authorization` 헤더를 허용 목록에 추가합니다.
+   허용 Origin은 발표 도메인 `https://wearcare-mate-dxqh.vercel.app`(끝 슬래시 없음). `*`는 쓰지 않습니다.
+   (기존 GET만 허용돼 있으면 프리플라이트 OPTIONS에서 POST가 막힐 수 있으니 반드시 확인)
+4. **Lambda 호출 권한**: `wearcare-mate-athena-test`의 실행 역할에 `wearcare-mate-ml`(AI/ML Lambda)에 한정한
+   `lambda:InvokeFunction`이 있어야 합니다. 기존 `/ai-guide` 경로가 이미 AI/ML을 호출하므로 대개 충족돼 있지만,
+   발표 API 연결 Lambda 기준으로 재확인합니다.
+5. **기능 스위치 + ML 환경변수**: Lambda 환경변수 `ENABLE_DEMO_ANOMALY=true`와 `ML_FUNCTION_NAME=wearcare-mate-ml`,
+   `ML_REGION=ap-northeast-2`를 설정합니다. 스위치는 발표 때만 켜고 끝나면 제거해 라우트를 404로 되돌립니다.
+6. **전체 응답 시간 확인**: 데모 호출은 실제 AI/ML(Bedrock 가이드 생성 포함)을 동기로 기다립니다. 가상 이상 입력
+   콘솔 검증에서 약 13.8초가 걸린 적이 있으므로, API Gateway 통합 타임아웃(HTTP API 최대 30초)과
+   `ML_TIMEOUT_SECONDS`(기본 15, 최대 29) 안에 들어오는지 확인합니다. 필요 시 `ML_TIMEOUT_SECONDS`를
+   29 이하에서 조정합니다. 프론트엔드는 자동 재시도를 하지 않으므로, 타임아웃 시 사용자에게 오류만 표시됩니다.
+7. **프론트엔드 연결**: 로그인으로 받은 Cognito 액세스 토큰을 `Authorization: Bearer <token>`로 실어
+   `POST {API_BASE}/demo/anomaly`를 호출합니다(본문 불필요 — 서버가 입력 고정). 응답의 `aiGuide`·`anomalies`를
+   기존 대시보드 화면 컴포넌트에 그대로 전달합니다(스키마가 `/ai-guide`와 동일). 구현 완료(아래 프론트엔드 섹션).
+8. **검증**: 토큰 없이 401, 스코프 부족 403, 유효 토큰으로 200과 `inputKind: "virtual"`·anomaly 가이드를 확인합니다.
+
+#### 기존 `wearcare-demo/read` 스코프를 데모 POST에도 쓸지 검토
+
+- **그대로 쓰는 쪽 근거**: 발표용 단일 데모 계정만 쓰고, 새 스코프·앱 클라이언트·동의 화면을 늘리지 않아 발표
+  준비가 단순합니다. 데모 입력은 서버가 고정하고 실제 사용자 데이터를 쓰지 않으므로, 읽기 권한과 위험 수준이
+  비슷합니다(가상 이상 1건 조회·표시).
+- **분리하는 쪽 근거(`wearcare-demo/demo` 등 별도 스코프)**: 이 라우트는 GET 조회와 달리 **실제 AI/ML Lambda를
+  호출(비용·지연 발생)**하고 **쓰기 성격의 작업**에 가깝습니다. 스코프를 분리하면 "읽기만 허용된 토큰"으로는
+  ML 호출을 못 하게 최소 권한을 지킬 수 있고, 발표 후 데모만 선택적으로 막기도 쉽습니다.
+- **판단**: 발표 범위가 좁고(가상 입력·단일 계정·기능 스위치로 상시 차단 가능) 실사용자 데이터를 쓰지 않으므로,
+  1차로는 **기존 `wearcare-demo/read` 재사용**이 합리적입니다. 다만 기능 스위치(`ENABLE_DEMO_ANOMALY`)로 상시
+  비활성을 유지하는 것을 전제로 하며, 데모가 상시 노출로 바뀌면 그때 별도 스코프로 분리할 것을 권장합니다.
+
+> 주의: 이 작업에서는 커밋·push·AWS·Vercel 변경과 실제 ML 호출을 하지 않았습니다. 위 절차는 승인 후 실행 계획입니다.
+> 백엔드 로컬 테스트 473건 통과는 **로컬 검증 결과일 뿐 AWS 배포 완료가 아닙니다.**
+
+### 2026-11-09 최종 상태 (위 구현 당시 기록의 후속 정정)
+
+- 사용자가 `wearcare-mate-athena-test`에 최신 ZIP을 업로드하고, Lambda `/dashboard` 200 응답 및 HTTPS 화면을 확인했습니다. 가상 이상 시연과 실제 데이터 복귀도 사용자 브라우저에서 확인했습니다.
+- 수면은 지정된 fixed CSV의 0~24시간 기록만 집계합니다. 실제 Athena 결과는 1,000건, 평균 7.47시간, 최솟값 3.11시간, 최댓값 12.36시간입니다. 분포는 [0,4), [4,6), [6,8), [8,10), [10,24] 순서로 9/165/455/319/52건입니다. 날짜 의미가 미확인이라 일별 수면 추이는 만들지 않습니다.
+- 심박은 전체 30,000행 중 양수 29,794행, 0값 206행입니다. 양수 평균은 79.9이며, 날짜별 양수 평균은 2025-10-15~2025-11-20의 37개 날짜를 반환합니다. 단위는 확정하지 않아 `unit=null`, `unitBasis=unconfirmed`로 반환합니다. Fitbit 사용자의 안정 시 심박으로 해석하지 않습니다.
+- 심리상담은 파일별 통합 1,328행·검증 175행만 반환합니다. 원문·개인 점수는 조회하지 않습니다. 세 요약은 별도 데이터셋이며 개별 실패를 격리합니다.
+- 웹 시연은 `notify=false` 고정으로 SNS 메일을 발송하지 않습니다. 기존 공개 예시 API는 유지합니다.
+- 현재 소스로 백엔드 전체 테스트 486개 통과를 재확인했습니다. 테스트 목 값과 위 실제 Athena 검증값은 구분합니다. 이 저장 작업에서 AWS 설정을 변경하거나 재배포하지 않았습니다.

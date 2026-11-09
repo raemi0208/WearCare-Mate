@@ -28,6 +28,7 @@ from src.dashboard_service import (
     build_steps_timeseries,
     compute_weekly_steps,
 )
+from src.dataset_summary import build_dataset_summaries, is_enabled as dataset_summary_enabled
 from src.data_source import DataSourceUnavailableError
 from src.health_service import build_activity_items
 from src.real_health_data import (
@@ -73,13 +74,20 @@ def fetch_dashboard_activity_items(client_factory=None, environ=None):
     return build_activity_items(mapped_rows, user_id)
 
 
-def build_real_dashboard(client_factory=None, environ=None, *, activity_items=None):
+def build_real_dashboard(client_factory=None, environ=None, *, activity_items=None,
+                         summary_client_factory=None):
     """REAL 대시보드 응답 본문을 만든다. (API.md 스키마, 걸음 수만 실제 데이터)
 
     Args:
         client_factory (callable | None): region 을 받아 Athena 클라이언트를 돌려주는 함수.
             None 이면 athena_repository.create_athena_client. 테스트에서는 가짜를 넣는다.
         environ (Mapping | None): 읽을 환경변수. None 이면 os.environ.
+        summary_client_factory (callable | None): 데이터셋 요약 집계용 Athena 클라이언트 팩토리.
+            None 이면 dataset_summary 기본값. 테스트에서 가짜를 주입한다.
+
+    데이터셋 요약(수면/심박/심리상담)은 ENABLE_DATASET_SUMMARY=true 일 때만 /dashboard 에 추가된다.
+    세 집계는 각각 독립적으로 실행되며, 실패해도 걸음 수·AI 가이드·다른 집계를 막지 않는다.
+    (build_dataset_summaries 가 내부에서 예외를 삼키고 status=error 로 채운다.)
 
     Raises:
         DataSourceUnavailableError: 스위치 꺼짐, AWS 조회 실패, 최대 행 수 도달 (503)
@@ -101,4 +109,19 @@ def build_real_dashboard(client_factory=None, environ=None, *, activity_items=No
         "steps": build_steps_timeseries(stats),
     }
     body["sleepStages"] = {"totalLabel": NO_SLEEP_STAGES["totalLabel"], "segments": []}
+
+    # MOCK 베이스가 가진 예시 데이터셋 요약 필드는 REAL 에서 제거한다.
+    # (스위치가 켜지면 아래에서 실제 Athena 집계로만 다시 채운다. 스위치 꺼짐이면 필드 없음.)
+    for key in ("sleepDatasetSummary", "heartRateDatasetSummary", "psychologyDatasetSummary"):
+        body.pop(key, None)
+
+    # 발표용 "별도 데이터셋" 요약. 스위치가 켜졌을 때만 /dashboard 응답에 추가한다.
+    # 집계 실패는 위 걸음 수/AI 가이드를 막지 않는다(개별 격리). /ai-guide 에는 추가하지 않는다.
+    if dataset_summary_enabled(environ):
+        summaries = build_dataset_summaries(
+            client_factory=summary_client_factory, environ=environ
+        )
+        body["sleepDatasetSummary"] = summaries["sleepDatasetSummary"]
+        body["heartRateDatasetSummary"] = summaries["heartRateDatasetSummary"]
+        body["psychologyDatasetSummary"] = summaries["psychologyDatasetSummary"]
     return body

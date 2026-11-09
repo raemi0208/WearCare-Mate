@@ -114,4 +114,22 @@ def build_dashboard_mock():
             {"id": "mock-n2", "icon": "🔔",
              "title": EXAMPLE_PREFIX + "주간 활동 요약을 확인해 보세요", "time": EXAMPLE_LABEL},
         ],
+        # 발표용 "별도 데이터셋" 요약 (MOCK). REAL 에서는 실제 Athena 집계로 덮어쓴다.
+        # 스키마 일관성을 위해 MOCK 에도 같은 키를 둔다. 값은 예시임을 status/라벨로 구분.
+        "sleepDatasetSummary": {
+            "status": "ok", "sourceLabel": "별도 데이터셋",
+            "averageHours": 7.47, "recordCount": 1000,
+        },
+        "heartRateDatasetSummary": {
+            "status": "ok", "sourceLabel": "별도 데이터셋",
+            "totalRows": 30000, "numericRows": 30000, "zeroRows": 206, "positiveRows": 29794,
+            "averageValue": 79.9, "averageBasis": "positive", "unit": "bpm",
+        },
+        "psychologyDatasetSummary": {
+            "status": "ok", "sourceLabel": "별도 데이터셋", "unit": "데이터 행 수",
+            "files": [
+                {"id": "integrated", "label": "통합 데이터셋", "rowCount": 1328},
+                {"id": "validation", "label": "검증 데이터셋", "rowCount": 175},
+            ],
+        },
     }

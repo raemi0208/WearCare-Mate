@@ -30,6 +30,9 @@ PATCH_CLIENT_FACTORY = "src.athena_repository.create_athena_client"
 # API.md 기준 스키마
 DASHBOARD_KEYS = {"user", "summaryStats", "timeseries", "sleepStages",
                   "anomalies", "aiGuide", "notifications"}
+# 발표용 "별도 데이터셋" 요약은 선택 키(MOCK 은 항상 포함, REAL 은 스위치 켜짐 시 포함).
+DATASET_SUMMARY_KEYS = {"sleepDatasetSummary", "heartRateDatasetSummary",
+                        "psychologyDatasetSummary"}
 AI_GUIDE_KEYS = {"model", "updatedAt", "headline", "text", "actions"}
 SEVERITIES = {"danger", "warn", "ok"}
 WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
@@ -75,7 +78,11 @@ class SchemaAssertions:
             self.assertIsInstance(action, str, f"{where}.actions[]")
 
     def assert_dashboard_schema(self, body):
-        self.assertEqual(set(body.keys()), DASHBOARD_KEYS)
+        # 필수 키는 모두 있어야 하고, 추가로 허용되는 것은 선택적 데이터셋 요약 키뿐이다.
+        keys = set(body.keys())
+        self.assertTrue(DASHBOARD_KEYS <= keys, DASHBOARD_KEYS - keys)
+        self.assertTrue(keys <= (DASHBOARD_KEYS | DATASET_SUMMARY_KEYS),
+                        keys - (DASHBOARD_KEYS | DATASET_SUMMARY_KEYS))
 
         user = body["user"]
         self.assertEqual(set(user.keys()), {"name", "meta", "initial"})
