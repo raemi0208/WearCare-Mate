@@ -100,3 +100,21 @@ test("dashboard sleep stages show a notice instead of an empty bar", () => {
   rerender(<SleepStages sleepStages={{totalLabel: "예시", segments: [{id: "deep", label: "깊은 수면", pct: 30, color: "black"}]}} />);
   expect(container.querySelector(".sleep-stages__seg")).toHaveStyle({width: "30%"});
 });
+test("37일 심박 차트의 축 날짜는 양 끝을 포함해 간격을 두고 표시하며 기록은 보존한다", () => {
+  const data = Array.from({length: 37}, (_, index) => ({
+    label: new Date(Date.UTC(2025, 9, 15 + index)).toISOString().slice(0, 10),
+    value: 70 + index,
+  }));
+  const {container} = render(<LineChart data={data} />);
+  const labels = [...container.querySelectorAll(".linechart__axis-label")];
+  expect(labels).toHaveLength(6);
+  expect(labels[0]).toHaveTextContent("2025-10-15");
+  expect(labels[5]).toHaveTextContent("2025-11-20");
+  expect(labels[0]).toHaveAttribute("text-anchor", "start");
+  expect(labels[5]).toHaveAttribute("text-anchor", "end");
+  for (let i = 1; i < labels.length; i++) {
+    expect(Number(labels[i].getAttribute("x")) - Number(labels[i - 1].getAttribute("x"))).toBeGreaterThan(90);
+  }
+  expect(container.querySelectorAll("circle")).toHaveLength(37);
+  expect(container.querySelectorAll("circle title")).toHaveLength(37);
+});

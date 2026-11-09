@@ -79,7 +79,13 @@ export default function LineChart({ data = [], height = 220 }) {
 
   // 긴 날짜가 겹치지 않도록 축에는 최대 약 8개만 표시한다.
   // 모든 기록의 날짜와 값은 각 점의 툴팁에서 확인할 수 있다.
-  const labelStep = Math.max(1, Math.ceil(items.length / 8));
+  const hasDateLabels = items.some((item) => /^\d{4}-\d{2}-\d{2}$/.test(item?.label || ""));
+  const labelCount = Math.min(items.length, hasDateLabels ? 6 : 8);
+  const labelIndices = new Set(
+    Array.from({ length: labelCount }, (_, index) =>
+      labelCount === 1 ? 0 : Math.round(index * (items.length - 1) / (labelCount - 1))
+    )
+  );
 
   return (
     <div className="chart linechart">
@@ -147,7 +153,7 @@ export default function LineChart({ data = [], height = 220 }) {
         {items.map((item, index) => {
           const valid = isValid(item);
           const showLabel =
-            index % labelStep === 0 || index === items.length - 1;
+            labelIndices.has(index);
 
           const countText =
             Number.isInteger(item?.includedRows) &&
@@ -193,7 +199,7 @@ export default function LineChart({ data = [], height = 220 }) {
                   className="linechart__axis-label"
                   x={xAt(index)}
                   y={chartHeight - 6}
-                  textAnchor="middle"
+                  textAnchor={items.length === 1 ? "middle" : index === 0 ? "start" : index === items.length - 1 ? "end" : "middle"}
                 >
                   {item?.label ?? ""}
                 </text>
