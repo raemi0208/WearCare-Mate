@@ -122,6 +122,7 @@ export async function prepareLogin() {
     state,
     code_challenge: challenge,
     code_challenge_method: "S256",
+    lang: "ko",
   });
   // 저장 검증 성공일 때만 authorize URL 을 보관(실패면 이동 불가하게 null 유지).
   preparedAuthorizeUrl = writeVerified
