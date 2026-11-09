@@ -5,6 +5,14 @@ import Badge from "./ui/Badge";
 export default function SleepStages({ sleepStages }) {
   const { totalLabel, segments } = sleepStages;
 
+  if (segments.length === 0) {
+    return (
+      <Card title="수면 단계 분석" action={<Badge variant="ghost">정보 미제공</Badge>}>
+        <p role="status">현재 데이터셋은 수면 단계 정보를 제공하지 않습니다.</p>
+      </Card>
+    );
+  }
+
   return (
     <Card
       title="수면 단계 분석"

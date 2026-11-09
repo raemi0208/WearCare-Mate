@@ -8,8 +8,10 @@ const SEVERITY_LABEL = {
   ok: "정상",
 };
 
-export default function AnomalyPanel({ anomalies = [], embedded = false, analysis }) {
+export default function AnomalyPanel({ anomalies = [], embedded = false, analysis, referenceDateOverride = null }) {
   const alertCount = anomalies.filter((a) => a.severity !== "ok").length;
+  // 가상 시연 중에는 상위가 넘긴 데모 기준일을 우선 표시한다(실제 analysis 는 바꾸지 않는다).
+  const displayReferenceDate = referenceDateOverride || analysis?.referenceDate;
 
   const list = (
     <div className="anomaly-list">
@@ -40,7 +42,7 @@ export default function AnomalyPanel({ anomalies = [], embedded = false, analysi
   return (
     <Card
       title="이상 패턴 탐지"
-      subtitle={analysis ? `${analysis.referenceDate} · 걸음 수 개인 기준선 분석` : "예시 분석 데이터"}
+      subtitle={displayReferenceDate ? `${displayReferenceDate} · 걸음 수 개인 기준선 분석` : "예시 분석 데이터"}
       action={
         <Badge variant={alertCount > 0 ? "danger" : "normal"}>
           {alertCount > 0 ? `${alertCount}건 감지` : analysis?.status === "insufficient_data" ? "데이터 부족" : "탐지 내역 없음"}

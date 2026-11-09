@@ -1,58 +1,110 @@
-import React from "react";
+import React, { useId } from "react";
 
-// 외부 라이브러리 없이 구현한 SVG 라인차트
-// data: [{ label, value, anomaly? }]
+// data: [{ label, value, anomaly?, includedRows? }]
 export default function LineChart({ data = [], height = 220 }) {
+  const gradientId = `wcm-area-${useId().replace(/:/g, "")}`;
+  const items = Array.isArray(data) ? data : [];
   const width = 640;
+  const chartHeight =
+    typeof height === "number" && Number.isFinite(height)
+      ? Math.max(height, 100)
+      : 220;
+
   const padX = 36;
   const padY = 24;
   const innerW = width - padX * 2;
-  const innerH = height - padY * 2;
+  const innerH = chartHeight - padY * 2;
 
-  if (data.length === 0) {
-    return <div className="chart"><p>조회된 데이터가 없습니다.</p></div>;
+  const isValid = (item) =>
+    item != null &&
+    typeof item.value === "number" &&
+    Number.isFinite(item.value);
+
+  const values = items.filter(isValid).map((item) => item.value);
+
+  if (items.length === 0) {
+    return (
+      <div className="chart">
+        <p>조회된 데이터가 없습니다.</p>
+      </div>
+    );
   }
 
-  const values = data.map((d) => d.value);
+  if (values.length === 0) {
+    return (
+      <div className="chart">
+        <p>표시할 값이 없습니다.</p>
+      </div>
+    );
+  }
+
   const max = Math.max(...values);
   const min = Math.min(...values);
-  // 위아래 여유를 둬 선이 가장자리에 붙지 않도록 함
   const range = max - min || 1;
   const top = max + range * 0.15;
   const bottom = min - range * 0.15;
   const span = top - bottom;
 
-  const xAt = (i) =>
-    data.length === 1 ? padX + innerW / 2 : padX + (innerW * i) / (data.length - 1);
-  const yAt = (v) => padY + innerH * (1 - (v - bottom) / span);
+  const xAt = (index) =>
+    items.length === 1
+      ? padX + innerW / 2
+      : padX + (innerW * index) / (items.length - 1);
 
-  const linePoints = data.map((d, i) => `${xAt(i)},${yAt(d.value)}`).join(" ");
-  const areaPoints = `${padX},${padY + innerH} ${linePoints} ${padX + innerW},${
-    padY + innerH
-  }`;
+  const yAt = (value) =>
+    padY + innerH * (1 - (value - bottom) / span);
 
-  // 가로 격자선 (4등분)
-  const gridLines = [0, 0.25, 0.5, 0.75, 1].map((t) => padY + innerH * t);
+  // 결측 지점마다 선과 면을 나눈다.
+  const segments = [];
+  let currentSegment = [];
+
+  items.forEach((item, index) => {
+    if (isValid(item)) {
+      currentSegment.push({
+        x: xAt(index),
+        y: yAt(item.value),
+      });
+    } else if (currentSegment.length > 0) {
+      segments.push(currentSegment);
+      currentSegment = [];
+    }
+  });
+
+  if (currentSegment.length > 0) {
+    segments.push(currentSegment);
+  }
+
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(
+    (fraction) => padY + innerH * fraction
+  );
+
+  // 긴 날짜가 겹치지 않도록 축에는 최대 약 8개만 표시한다.
+  // 모든 기록의 날짜와 값은 각 점의 툴팁에서 확인할 수 있다.
+  const labelStep = Math.max(1, Math.ceil(items.length / 8));
 
   return (
     <div className="chart linechart">
       <svg
-        viewBox={`0 0 ${width} ${height}`}
+        viewBox={`0 0 ${width} ${chartHeight}`}
         role="img"
         aria-label="시계열 추이 라인 차트"
         preserveAspectRatio="xMidYMid meet"
       >
         <defs>
-          <linearGradient id="wcm-area" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient
+            id={gradientId}
+            x1="0"
+            y1="0"
+            x2="0"
+            y2="1"
+          >
             <stop offset="0%" stopColor="#141414" stopOpacity="0.14" />
             <stop offset="100%" stopColor="#141414" stopOpacity="0" />
           </linearGradient>
         </defs>
 
-        {/* 격자선 */}
-        {gridLines.map((y, i) => (
+        {gridLines.map((y, index) => (
           <line
-            key={i}
+            key={index}
             className="linechart__grid-line"
             x1={padX}
             y1={y}
@@ -61,50 +113,94 @@ export default function LineChart({ data = [], height = 220 }) {
           />
         ))}
 
-        {/* 면 그라데이션 */}
-        <polygon points={areaPoints} fill="url(#wcm-area)" />
+        {segments.map((segment, index) => {
+          if (segment.length < 2) return null;
 
-        {/* 라인 */}
-        <polyline
-          points={linePoints}
-          fill="none"
-          stroke="#141414"
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+          const points = segment
+            .map((point) => `${point.x},${point.y}`)
+            .join(" ");
 
-        {/* 데이터 포인트 (이상치는 강조) */}
-        {data.map((d, i) => (
-          <g key={i}>
-            <circle
-              className={d.anomaly ? "linechart__anomaly" : "linechart__point"}
-              cx={xAt(i)}
-              cy={yAt(d.value)}
-              r={d.anomaly ? 6 : 4}
-            />
-            {d.anomaly && (
-              <circle
-                cx={xAt(i)}
-                cy={yAt(d.value)}
-                r="11"
-                fill="none"
-                stroke="#9b2c2c"
-                strokeWidth="1.5"
-                strokeDasharray="3 3"
+          const first = segment[0];
+          const last = segment[segment.length - 1];
+          const areaPoints =
+            `${first.x},${padY + innerH} ` +
+            `${points} ${last.x},${padY + innerH}`;
+
+          return (
+            <g key={`segment-${index}`}>
+              <polygon
+                points={areaPoints}
+                fill={`url(#${gradientId})`}
               />
-            )}
-            {/* x축 라벨 */}
-            <text
-              className="linechart__axis-label"
-              x={xAt(i)}
-              y={height - 6}
-              textAnchor="middle"
-            >
-              {d.label}
-            </text>
-          </g>
-        ))}
+              <polyline
+                points={points}
+                fill="none"
+                stroke="#141414"
+                strokeWidth="2.5"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            </g>
+          );
+        })}
+
+        {items.map((item, index) => {
+          const valid = isValid(item);
+          const showLabel =
+            index % labelStep === 0 || index === items.length - 1;
+
+          const countText =
+            Number.isInteger(item?.includedRows) &&
+            item.includedRows >= 0
+              ? ` · 포함 ${item.includedRows.toLocaleString()}건`
+              : "";
+
+          return (
+            <g key={`point-${index}`}>
+              {valid && (
+                <>
+                  <circle
+                    className={
+                      item.anomaly
+                        ? "linechart__anomaly"
+                        : "linechart__point"
+                    }
+                    cx={xAt(index)}
+                    cy={yAt(item.value)}
+                    r={item.anomaly ? 6 : 4}
+                  >
+                    <title>
+                      {`${item.label ?? ""}: ${item.value}${countText}`}
+                    </title>
+                  </circle>
+
+                  {item.anomaly && (
+                    <circle
+                      cx={xAt(index)}
+                      cy={yAt(item.value)}
+                      r="11"
+                      fill="none"
+                      stroke="#9b2c2c"
+                      strokeWidth="1.5"
+                      strokeDasharray="3 3"
+                    />
+                  )}
+                </>
+              )}
+
+              {showLabel && (
+                <text
+                  className="linechart__axis-label"
+                  x={xAt(index)}
+                  y={chartHeight - 6}
+                  textAnchor="middle"
+                >
+                  {item?.label ?? ""}
+                </text>
+              )}
+            </g>
+          );
+        })}
       </svg>
     </div>
   );

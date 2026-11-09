@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import App from "./App";
 import { fetchDashboard, fetchAiGuide, fetchDemoAnomaly } from "./services/api";
 
@@ -174,4 +174,66 @@ test("실제 데이터로 돌아가기는 시연 결과만 해제한다", async 
   expect(screen.queryByText("평소 대비 걸음 수 감소")).not.toBeInTheDocument();
   // 실제 데이터 카드는 그대로.
   expect(screen.getByText("12,369")).toBeInTheDocument();
+});
+
+test("시연 기준일 전환과 실제 집계·차트 보존을 확인한다", async () => {
+  fetchDemoAnomaly.mockResolvedValue(demoResponse);
+  render(<App />);
+  await screen.findByText("평균 걸음 수");
+
+  const dateCard = () =>
+    screen.getByText(
+      /^(선택한 날짜의 걸음 수만 판정했습니다\.|가상 시연 입력에 대한 이상 탐지 결과입니다\.)$/
+    ).closest(".card");
+
+  const guideCard = () =>
+    screen.getByText("AI 맞춤 건강 가이드").closest(".ai-guide");
+
+  const checkDate = (date) => {
+    expect(
+      within(dateCard()).getByText(`분석 기준일: ${date}`)
+    ).toBeInTheDocument();
+    expect(
+      within(guideCard()).getByText(`분석 기준일: ${date}`)
+    ).toBeInTheDocument();
+  };
+
+  const chart = screen.getByLabelText("시계열 추이 라인 차트");
+  const originalChart = chart.outerHTML;
+  const originalTimeseries = JSON.stringify(dashboard.timeseries);
+
+  checkDate("2016-04-10");
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "가상 이상 시연" })
+  );
+  await screen.findByText("생성형 AI");
+
+  checkDate("2026-10-30");
+  expect(
+    screen.queryByText("분석 기준일: 2016-04-10")
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("12,369")).toBeInTheDocument();
+  expect(
+    screen.getByLabelText("시계열 추이 라인 차트").outerHTML
+  ).toBe(originalChart);
+  expect(JSON.stringify(dashboard.timeseries)).toBe(originalTimeseries);
+  expect(dashboard.analysis.referenceDate).toBe("2016-04-10");
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "실제 데이터로 돌아가기" })
+  );
+
+  await waitFor(() => checkDate("2016-04-10"));
+
+  expect(
+    screen.queryByText("분석 기준일: 2026-10-30")
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("가상 시연 중 · 실제 사용자 기록 아님")
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("12,369")).toBeInTheDocument();
+  expect(
+    screen.getByLabelText("시계열 추이 라인 차트").outerHTML
+  ).toBe(originalChart);
 });

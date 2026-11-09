@@ -151,7 +151,13 @@ function App() {
     const viewData = demoActive
       ? { ...data, aiGuide: demoResult.aiGuide, anomalies: demoResult.anomalies }
       : data;
-    const common = { data: viewData };
+    // 가상 시연 중 표시용 기준일. 실제 data.analysis(2016-04-10)는 건드리지 않고,
+    // 화면에는 데모 응답의 aiGuide.referenceDate 만 쓴다. (UI 에 날짜를 하드코딩하지 않는다)
+    const demoReferenceDate = demoActive
+      ? (demoResult.aiGuide && demoResult.aiGuide.referenceDate) || null
+      : null;
+    // 가상 시연 안내/날짜를 각 페이지가 일관되게 쓰도록 공통 prop 으로 전달한다.
+    const common = { data: viewData, demoActive, demoReferenceDate };
     // 시연 결과를 보는 동안에는 "분석 및 가이드 다시 확인"(실제 /ai-guide 재조회)을 숨긴다.
     // 시연(가상 가이드) 표시 중에 실제 데이터 요청이 섞여 data.aiGuide 를 덮어쓰는 것을 막기 위함이다.
     // 실제 데이터로 돌아간 뒤에는 다시 재확인 버튼이 나타난다.
