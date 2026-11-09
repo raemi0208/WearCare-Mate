@@ -166,3 +166,9 @@ export function updateProfile(profile) {
   saveProfile(profile);
   return delay(profile, 300);
 }
+
+// 목록에서만 숨긴다. 실제 메일과 중복 발송 방지 기록은 유지된다.
+export function hideNotification(eventId) {
+  return request("/demo/anomaly", null, { method: "POST", fallbackOnly: true,
+    body: { action: "hide_notification", eventId } });
+}

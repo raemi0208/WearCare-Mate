@@ -253,9 +253,9 @@ test("다중 지표 결과를 저장하고 명시적 발송 버튼에서만 요�
   await screen.findByText("생성형 AI");
   expect(fetchDemoAnomaly).toHaveBeenCalledWith("multi");
   expect(sendDemoEmail).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", {name: "SNS 이메일 발송 시연"}));
+  fireEvent.click(screen.getByRole("button", {name: "SNS 메일 발송"}));
   await waitFor(() => expect(sendDemoEmail).toHaveBeenCalledWith("saved"));
-  await waitFor(() => expect(screen.getByRole("button", {name: "발송 시연 처리됨"})).toBeDisabled());
+  await waitFor(() => expect(screen.getByRole("button", {name: "발송 요청 처리됨"})).toBeDisabled());
   expect(screen.getByText(notice.title)).toBeInTheDocument();
   view.unmount();
   fetchDashboard.mockResolvedValue({...dashboard, guideHistory: [savedGuide], notifications: [notice], historyStatus: "ok"});

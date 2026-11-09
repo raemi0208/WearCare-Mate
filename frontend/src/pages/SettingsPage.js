@@ -137,7 +137,7 @@ export default function SettingsPage({ user, onProfileSaved }) {
       </Card>
 
       <Card title="알림 설정" subtitle="시연용 알림 선호 설정">
-        <p className="ui-note">변경 사항 저장을 누르면 이 브라우저에만 저장됩니다. 실제 SNS 이메일 수신 설정에는 반영되지 않으며, 웹 가상 시연에서는 이메일을 발송하지 않습니다.</p>
+        <p className="ui-note">변경 사항 저장을 누르면 이 브라우저에만 저장됩니다. 실제 SNS 이메일 수신 설정에는 반영되지 않습니다. 분석만으로는 메일을 보내지 않으며, 대시보드의 SNS 메일 발송 버튼을 누르면 기존 구독 주소로 실제 이메일을 보냅니다.</p>
         <div className="toggle-list">
           <label className="toggle-item">
             <span>

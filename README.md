@@ -1,3 +1,14 @@
+> **현재 HTTPS 발표 구현 (2026-11-10)**
+>
+> https://wearcare-mate-dxqh.vercel.app/ · 배포 브랜치 `frontend-b-cognito-auth`.
+> Cognito 로그인 → API Gateway/Lambda → S3/Glue/Athena 실제 데이터 조회,
+> AI/ML Lambda 판정 + Bedrock 가이드 생성, Vercel 웹 배포를 사용합니다.
+> 알림·가이드 이력은 계정별 DynamoDB 보관이며, SNS 메일 발송 버튼은 기존 구독자에게 실제 이메일을 보냅니다.
+> 알림 삭제는 목록 숨김이며 발송 기록·중복 방지·가이드는 유지합니다.
+> 프로필과 알림 선호 설정은 표시용 브라우저 저장이며 실제 SNS 구독 설정을 바꾸지 않습니다.
+> Fitbit 개인 기록·별도 수면/심박 집계·가상 시나리오 입력을 구분합니다.
+> 수면 단계 정보와 실제 기기 연결은 제공하지 않습니다. [현재 API 명세](docs/API.md)를 참고하세요.
+
 # WearCare Mate · 웨어러블 기반 AI 건강 주치의
 
 웨어러블 시계열 데이터를 분석하고, 생성형 AI 기반 개인 맞춤형 건강 행동 가이드를 제공하는 서비스입니다.

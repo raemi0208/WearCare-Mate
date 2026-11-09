@@ -1,3 +1,27 @@
+> **현재 배포 기준 (2026-11-10)**
+>
+> 인증 API: `https://tirb2qdtj8.execute-api.ap-northeast-2.amazonaws.com`.
+> Cognito access token을 `Authorization: Bearer ...`로 전달하며 scope는 `wearcare-demo/read`입니다.
+> 아래 JSON의 수면 단계·기기·개인 심박 값은 디자인 예시이며, 현재 실제 응답을 보장하지 않습니다.
+> 실제 Fitbit 기준일은 2016-04-10, 가상 시연 기준일은 2026-11-14입니다.
+> 별도 데이터셋 집계는 `sleepDatasetSummary`와 `heartRateDatasetSummary`이며 개인 timeseries와 합치지 않습니다.
+> 현재 탐지는 Lambda 내 기준선/집단 편차 로직입니다. SageMaker 실시간 엔드포인트를 호출하지 않습니다.
+
+## 현재 시연·저장 요청
+
+- 분석: `POST /demo/anomaly`, JSON `{ "scenario": "steps|sleep|hrv|stress|multi" }`.
+- 실제 SNS 메일: 같은 POST에 `{ "action": "send", "eventId": "분석 응답 eventId" }`.
+  기존 구독자에게 저장된 가이드만 발송합니다. 주소·본문은 클라이언트에서 지정하지 않습니다.
+- 알림 목록 삭제: 같은 POST에 `{ "action": "hide_notification", "eventId": "알림 id" }`.
+  해당 계정 목록에서 숨길 뿐, 원본 발송 결과·중복 방지 기록·가이드를 삭제하지 않습니다.
+- 저장 내역: `GET /history?cursor=...` → `guideHistory`, `notifications`, `nextCursor`, `historyStatus`.
+- 분석 성공 응답에는 `scenario`, `scenarioLabel`, `aiGuide`, `anomalies`, `eventId`, `persistenceStatus`가 포함됩니다.
+- 생성된 가이드·메일 요청 내역은 계정별 영구 저장입니다. 기존 미저장 기록은 소급 복원하지 않습니다.
+- `accepted`는 SNS 접수 상태이며 메일 수신 확인과 구분합니다. pending/unknown은 자동 재발송하지 않습니다.
+- 조회·재조회·페이지 이동·시나리오 선택만으로 메일을 보내지 않습니다.
+
+---
+
 # WearCare Mate · 프론트엔드 ↔ 백엔드 API 명세
 
 백엔드 작업자를 위한 정리본입니다. 프론트엔드(React 웹 대시보드)가 **실제로 소비하는 데이터 형태**를 기준으로 작성했습니다.
@@ -17,8 +41,10 @@
 
 | 메서드 | 경로 | 용도 | 대응 AWS 서비스 |
 | --- | --- | --- | --- |
-| `GET` | `/dashboard` | 대시보드 전체 데이터 한 번에 조회 | Timestream 조회 + SageMaker 결과 + Bedrock 가이드 취합 |
-| `GET` | `/ai-guide` | AI 건강 가이드만 재생성 | Bedrock 재호출 |
+| `GET` | `/dashboard` | 대시보드 전체 데이터 한 번에 조회 | Athena 조회 + AI/ML Lambda 판정 + Bedrock 가이드 취합 |
+| `GET` | `/ai-guide` | 실제 기록의 판정·가이드 다시 확인, 메일 미발송 | AI/ML Lambda + Bedrock |
+| `POST` | `/demo/anomaly` | 가상 시나리오 분석·저장 결과 메일 발송·알림 숨김 | Lambda + Bedrock + DynamoDB + SNS |
+| `GET` | `/history` | 계정별 저장 내역과 다음 페이지 조회 | DynamoDB |
 
 > **프로필은 백엔드 API를 쓰지 않습니다.** 사용자 프로필 정보는 데이터베이스를 거치지 않고
 > 브라우저 `localStorage`(키: `wearcare.profile`)에 저장됩니다. (`frontend/src/services/profileStorage.js`)
@@ -30,7 +56,7 @@
 
 대시보드 화면 전체를 한 번의 요청으로 채웁니다.
 
-### 응답 스키마
+### 예시 응답 스키마 (디자인 참고용, 현재 실제 데이터와 구분)
 
 ```jsonc
 {
@@ -72,7 +98,7 @@
     ]
   },
 
-  // SageMaker 이상 탐지 결과 목록
+  // AI/ML Lambda 이상 탐지 결과 목록
   "anomalies": [
     {
       "id": "a1",
@@ -148,7 +174,7 @@
 | --- | --- | --- |
 | `label` | string | x축 라벨 (요일) |
 | `value` | number | **반드시 숫자.** 차트가 수치로 계산 |
-| `anomaly` | boolean | SageMaker 이상 판정 지점 여부 (true면 빨간 점 + 점선 원 강조) |
+| `anomaly` | boolean | AI/ML Lambda 이상 판정 지점 여부 (true면 빨간 점 + 점선 원 강조) |
 
 #### `sleepStages`
 | 필드 | 타입 | 설명 |
@@ -262,16 +288,16 @@ AI 건강 가이드만 다시 생성합니다. (대시보드의 "가이드 다�
 ## 백엔드 체크리스트
 
 - [ ] `timeseries`의 `value`는 **숫자**로 반환 (문자열 X). 요약 카드 `summaryStats.value`만 표시용 문자열.
-- [ ] SageMaker 이상 판정 지점은 `timeseries[].anomaly = true`로 플래그.
+- [ ] AI/ML Lambda 이상 판정 지점은 `timeseries[].anomaly = true`로 플래그.
 - [ ] `severity`는 `danger` / `warn` / `ok` 세 값만 사용.
 - [ ] `sleepStages.segments[].pct` 합계 = 100.
 - [ ] `time`, `updatedAt`, `meta` 등 표시용 문자열은 포맷(요일/상대시간)까지 서버에서 생성 권장.
-- [ ] API Gateway에서 **CORS 허용** (Amplify 배포 도메인 기준).
+- [ ] API Gateway에서 **CORS 허용** (Vercel 배포 도메인 기준).
 - [ ] 응답 실패(HTTP 4xx/5xx) 시 프론트는 에러 화면을 표시 → 적절한 상태코드 반환.
 
 ## 전체 데이터 흐름 (참고)
 
 1. **데이터 수집·저장** — 웨어러블 데이터셋 S3 적재, Lambda 전처리
-2. **시계열 저장·이상 탐지** — Timestream 저장, SageMaker 평소 패턴 학습/이상 탐지 → `anomalies`, `timeseries[].anomaly`
+2. **시계열 저장·이상 탐지** — Athena 저장, AI/ML Lambda 평소 패턴 학습/이상 탐지 → `anomalies`, `timeseries[].anomaly`
 3. **AI 가이드 생성** — Bedrock → `aiGuide`
-4. **알림·웹 서빙** — SNS 푸시(`notifications`), Amplify 웹 대시보드가 `GET /dashboard`로 취합 조회
+4. **알림·웹 서빙** — SNS 푸시(`notifications`), Vercel 웹 대시보드가 `GET /dashboard`로 취합 조회

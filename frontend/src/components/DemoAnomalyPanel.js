@@ -28,7 +28,7 @@ export default function DemoAnomalyPanel({ onRun, onReset, loading = false, acti
         </div>
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <label>시연 시나리오{" "}
+          <label>
             <select aria-label="시연 시나리오" value={scenario} disabled={loading || sending} onChange={(e) => setScenario(e.target.value)}>
               <option value="steps">걸음 수 감소</option>
               <option value="sleep">수면 부족</option>
@@ -48,7 +48,7 @@ export default function DemoAnomalyPanel({ onRun, onReset, loading = false, acti
 
           {active && onSend && (
             <button type="button" className="btn" disabled={!canSend || loading || sending || Boolean(delivery)} onClick={onSend}>
-              {sending ? "발송 요청 중…" : delivery ? "발송 시연 처리됨" : "SNS 이메일 발송 시연"}
+              {sending ? "발송 요청 중…" : delivery ? "발송 요청 처리됨" : "SNS 메일 발송"}
             </button>
           )}
           {active && (
@@ -71,7 +71,7 @@ export default function DemoAnomalyPanel({ onRun, onReset, loading = false, acti
         </p>
       )}
 
-      {active && <p className="ui-note" style={{ marginTop: 10 }}>분석만으로는 이메일을 보내지 않습니다. 발송 시연은 기존 SNS 구독 주소로 실제 이메일을 요청하며, 같은 결과는 한 번만 발송합니다.</p>}
+      {active && <p className="ui-note" style={{ marginTop: 10 }}>분석만으로는 이메일을 보내지 않습니다. SNS 메일 발송 버튼은 기존 SNS 구독 주소로 실제 이메일을 보내며, 같은 결과는 한 번만 발송합니다.</p>}
       {delivery && <p className="ui-note" role="status">{delivery.title}{delivery.status === "accepted" ? " · SNS 접수 결과이며 수신함 도착 확인은 별도입니다." : " · 중복 방지를 위해 다시 보내지 않습니다."}</p>}
       {persistenceWarning && <p className="ui-note" role="status">{persistenceWarning}</p>}
       {error && (

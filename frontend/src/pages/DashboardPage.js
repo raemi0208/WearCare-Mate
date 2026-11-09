@@ -8,7 +8,7 @@ import Notifications from "../components/Notifications";
 import DatasetSummaryCards from "../components/DatasetSummaryCards";
 import DemoBanner from "../components/DemoBanner";
 
-export default function DashboardPage({ data, onRegenerate, regenerating, demoActive = false, demoReferenceDate = null }) {
+export default function DashboardPage({ data, onRegenerate, regenerating, demoActive = false, demoReferenceDate = null, onHideNotification }) {
   // 분석 기준일/이상 탐지 카드는 가상 결과(anomalies)를 설명하는 영역이다.
   // 시연 중에는 데모 기준일을 표시하되, 실제 data.analysis 는 바꾸지 않는다.
   // (상단 통계·추이 차트 등 실제 집계의 2016년 값은 그대로 유지한다.)
@@ -47,7 +47,7 @@ export default function DashboardPage({ data, onRegenerate, regenerating, demoAc
             onRegenerate={onRegenerate}
             regenerating={regenerating}
           />
-          <Notifications notifications={data.notifications} />
+          <Notifications notifications={data.notifications} onHide={onHideNotification} />
         </div>
       </div>
     </>
