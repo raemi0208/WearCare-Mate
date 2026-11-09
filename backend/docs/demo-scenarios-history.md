@@ -27,3 +27,10 @@ JWT authorizer sxfyqg 및 wearcare-demo/read scope는 기존 경로와 동일합
 DEMO_SNS_TOPIC_ARN=arn:aws:sns:ap-northeast-2:709569057941:wearcare-mate-alert.
 실행 역할은 해당 테이블 GetItem/PutItem/UpdateItem/Query 및 해당 SNS 주제 Publish만 추가합니다.
 기존 조회·재확인·페이지 이동·새로고침은 이메일을 발송하지 않습니다.
+
+## 알림 목록 정리
+
+POST /demo/anomaly에 `{ "action": "hide_notification", "eventId": "..." }`를 보내면
+로그인 계정의 해당 알림만 목록에서 숨깁니다. notificationHidden 속성만 갱신하며,
+가이드·원본 발송 결과·중복 발송 방지 기록은 유지합니다. 이메일을 회수하거나 재발송을 허용하지 않습니다.
+실제 메일 발송 버튼 표시는 `SNS 메일 발송`입니다. 분석·조회는 발송하지 않고 버튼에서만 기존 구독자에게 발송합니다.

@@ -15,6 +15,7 @@ class Conditional(Exception):
 
 class MemoryStore:
     rows = {}
+    hidden = set()
     client = Mock()
     client.exceptions.ConditionalCheckFailedException = Conditional
 
@@ -37,10 +38,15 @@ class MemoryStore:
             raise Conditional()
         self.update(key, value)
 
+    def hide_notification(self, key):
+        if not (self.get(key) or {}).get('notification'):
+            raise h.HistoryError(404, 'notification_not_found')
+        self.hidden.add((self.owner, key))
+
     def page(self, cursor=None):
         values = [v for (owner, _), v in self.rows.items() if owner == self.owner]
         return dict(historyStatus='ok', guideHistory=[v['result']['aiGuide'] for v in values if 'result' in v],
-                    notifications=[v['notification'] for v in values if 'notification' in v], nextCursor=None)
+                    notifications=[v['notification'] for v in values if 'notification' in v and (self.owner, v['id']) not in self.hidden], nextCursor=None)
 
 
 def event(body=None, subject='account-a'):
@@ -55,6 +61,7 @@ def result(scenario='multi'):
 class HistoryFlowTest(unittest.TestCase):
     def setUp(self):
         MemoryStore.rows = {}
+        MemoryStore.hidden = set()
         self.env = patch.dict(os.environ, {'DEMO_SNS_TOPIC_ARN': 'arn:aws:sns:ap-northeast-2:709569057941:wearcare-mate-alert'})
         self.env.start()
         self.addCleanup(self.env.stop)
@@ -197,3 +204,39 @@ class HistoryFlowTest(unittest.TestCase):
         args = client.update_item.call_args.kwargs
         self.assertEqual(args['ConditionExpression'], 'attribute_exists(pk) AND attribute_not_exists(delivery)')
         self.assertEqual(args['Key']['pk']['S'], 'USER#owner')
+
+
+class NotificationHidingTest(unittest.TestCase):
+    setUp = HistoryFlowTest.setUp
+    analyze = HistoryFlowTest.analyze
+    def test_hide_keeps_guide_receipt_and_duplicate_send_prevention(self):
+        res = self.analyze()
+        sns = Mock()
+        sns.publish.return_value = {'MessageId': 'accepted'}
+        send = event({'action': 'send', 'eventId': res['eventId']})
+        h.handle_demo(send, MemoryStore, sns_factory=lambda: sns)
+        hidden = h.handle_demo(event({'action': 'hide_notification', 'eventId': res['eventId']}), MemoryStore)
+        self.assertEqual(hidden['hiddenEventId'], res['eventId'])
+        page = h.read_history(event(), MemoryStore)
+        self.assertEqual(page['notifications'], [])
+        self.assertEqual(len(page['guideHistory']), 1)
+        duplicate = h.handle_demo(send, MemoryStore, sns_factory=lambda: sns)
+        self.assertTrue(duplicate['duplicate'])
+        self.assertEqual(sns.publish.call_count, 1)
+
+    def test_other_account_cannot_hide(self):
+        res = self.analyze()
+        with self.assertRaises(h.HistoryError) as caught:
+            h.handle_demo(event({'action': 'hide_notification', 'eventId': res['eventId']}, 'other'), MemoryStore)
+        self.assertEqual(caught.exception.status, 404)
+
+    def test_dynamodb_hide_changes_only_visibility_attribute(self):
+        client = Mock()
+        store = h.HistoryStore('owner', client=client, table='history')
+        client.get_item.return_value = {'Item': {'payload': {'S': json.dumps({'notification': {'status': 'accepted'}})}}}
+        store.hide_notification('a' * 32)
+        args = client.update_item.call_args.kwargs
+        self.assertEqual(args['UpdateExpression'], 'SET notificationHidden = :hidden')
+        client.query.return_value = {'Items': [{'notificationHidden': {'BOOL': True},
+            'payload': {'S': json.dumps({'notification': {'status': 'accepted'}})}}]}
+        self.assertEqual(store.page()['notifications'], [])

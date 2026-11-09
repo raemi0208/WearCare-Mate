@@ -1,3 +1,17 @@
+> **현재 발표 구현 (2026-11-10)**
+>
+> HTTPS 발표 사이트: https://wearcare-mate-dxqh.vercel.app/
+> 로그인은 Cognito, 웹은 Vercel, API는 API Gateway + Lambda입니다.
+> 실제 기록은 S3/Glue/Athena에서 조회하고, AI/ML Lambda의 기준선·집단 편차 판정과
+> Amazon Bedrock 가이드 생성을 사용합니다. 현재 웹 요청 경로는 Timestream이나
+> SageMaker 실시간 추론 엔드포인트를 호출하지 않습니다.
+> Fitbit 개인 걸음 수와 별도 수면·심박 데이터셋은 합치지 않습니다.
+> 가상 이상 시연은 걸음 수·수면·HRV·스트레스·다중 지표를 선택할 수 있습니다.
+> 명시적 메일 발송 버튼으로 기존 SNS 구독자에게 실제 이메일을 보내며,
+> 알림·가이드 내역은 Cognito 계정별 DynamoDB 영구 보관입니다.
+> 상세 동작은 [현재 시연·저장 명세](backend/docs/demo-scenarios-history.md)를 따릅니다.
+> 아래 초기 기획 내용에 다른 서비스가 등장하면 현재 배포 동작과 구분해 읽어 주세요.
+
 # 웨어케어 메이트 (WearCare Mate)
 > 웨어러블 기반 AI 건강 주치의: 웨어러블 시계열 데이터 분석 및 생성형 AI 기반 개인 맞춤형 건강 행동 가이드 서비스
 
