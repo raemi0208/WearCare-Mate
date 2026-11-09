@@ -11,7 +11,9 @@ import GuidePage from "./pages/GuidePage";
 import DevicesPage from "./pages/DevicesPage";
 import SettingsPage from "./pages/SettingsPage";
 
-import { fetchDashboard, fetchAiGuide } from "./services/api";
+import DemoAnomalyPanel from "./components/DemoAnomalyPanel";
+
+import { fetchDashboard, fetchAiGuide, fetchDemoAnomaly } from "./services/api";
 import { isAuthEnabled } from "./services/authConfig";
 import { login, logout } from "./services/cognitoAuth";
 
@@ -51,6 +53,11 @@ function App() {
   const [regenerating, setRegenerating] = useState(false);
   const [guideError, setGuideError] = useState(null);
   const [authError, setAuthError] = useState(false);
+  // 가상 이상 시연 상태. demoResult 가 있으면 화면의 aiGuide/anomalies 만 이 값으로 덮어 표시한다.
+  // (원본 data 는 그대로 보존한다. "실제 데이터로 돌아가기"로 demoResult 만 비우면 복원된다.)
+  const [demoResult, setDemoResult] = useState(null);
+  const [demoLoading, setDemoLoading] = useState(false);
+  const [demoError, setDemoError] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -98,6 +105,38 @@ function App() {
     setData((prev) => (prev ? { ...prev, user: updatedUser } : prev));
   }, []);
 
+  // 가상 이상 시연 실행: 버튼 클릭 시에만 POST /demo/anomaly 를 "1회" 호출한다.
+  // 자동 재시도는 하지 않는다. 실패 시 오류만 표시하고 예시 응답으로 대체하지 않는다.
+  const handleRunDemo = useCallback(() => {
+    setDemoError(null);
+    setDemoLoading(true);
+    fetchDemoAnomaly()
+      .then((res) => {
+        // 응답은 /ai-guide 와 같은 aiGuide + anomalies 배열(inputKind="virtual").
+        setDemoResult({
+          aiGuide: res.aiGuide,
+          anomalies: Array.isArray(res.anomalies) ? res.anomalies : [],
+        });
+      })
+      .catch((err) => {
+        if (err && err.authRequired) {
+          // 토큰 없음/만료/권한 없음: 로그인 안내로 전환(예시 대체 없음)
+          setAuthError(true);
+        } else {
+          setDemoError(
+            "가상 이상 시연을 실행하지 못했습니다. 예시로 대체하지 않습니다. 잠시 후 다시 시도해 주세요."
+          );
+        }
+      })
+      .finally(() => setDemoLoading(false));
+  }, []);
+
+  // 시연 결과만 해제한다(실제 데이터·기존 가이드 상태는 건드리지 않는다).
+  const handleResetDemo = useCallback(() => {
+    setDemoResult(null);
+    setDemoError(null);
+  }, []);
+
   const meta = PAGE_META[activeNav] || PAGE_META.dashboard;
 
   // 인증 모드에서 토큰 없음/만료/권한 없음: 실제 데이터 대신 로그인 안내 화면
@@ -107,7 +146,16 @@ function App() {
 
   function renderPage() {
     if (!data) return null;
-    const common = { data };
+    // 시연 결과가 있으면 화면용으로 aiGuide/anomalies 만 덮는다. 원본 data 는 보존한다.
+    const demoActive = Boolean(demoResult);
+    const viewData = demoActive
+      ? { ...data, aiGuide: demoResult.aiGuide, anomalies: demoResult.anomalies }
+      : data;
+    const common = { data: viewData };
+    // 시연 결과를 보는 동안에는 "분석 및 가이드 다시 확인"(실제 /ai-guide 재조회)을 숨긴다.
+    // 시연(가상 가이드) 표시 중에 실제 데이터 요청이 섞여 data.aiGuide 를 덮어쓰는 것을 막기 위함이다.
+    // 실제 데이터로 돌아간 뒤에는 다시 재확인 버튼이 나타난다.
+    const regenerateHandler = demoActive ? undefined : handleRegenerate;
     switch (activeNav) {
       case "trends":
         return <TrendsPage {...common} />;
@@ -117,7 +165,7 @@ function App() {
         return (
           <GuidePage
             {...common}
-            onRegenerate={handleRegenerate}
+            onRegenerate={regenerateHandler}
             regenerating={regenerating}
           />
         );
@@ -135,7 +183,7 @@ function App() {
         return (
           <DashboardPage
             {...common}
-            onRegenerate={handleRegenerate}
+            onRegenerate={regenerateHandler}
             regenerating={regenerating}
           />
         );
@@ -163,6 +211,18 @@ function App() {
             </div>
           )}
           {guideError && <p role="alert">{guideError}</p>}
+          {/* 가상 이상 시연: 인증 모드에서 대시보드 탭일 때만 노출(토큰 첨부 경로가 유효한 경우) */}
+          {isAuthEnabled() && activeNav === "dashboard" && data && !loading && !error && (
+            <div style={{ marginBottom: 16 }}>
+              <DemoAnomalyPanel
+                onRun={handleRunDemo}
+                onReset={handleResetDemo}
+                loading={demoLoading}
+                active={Boolean(demoResult)}
+                error={demoError}
+              />
+            </div>
+          )}
           {loading && <LoadingState />}
           {error && <ErrorState message={error} />}
           {data && !loading && !error && renderPage()}

@@ -72,10 +72,20 @@ function delay(data, ms = 350) {
   return new Promise((resolve) => setTimeout(() => resolve(data), ms));
 }
 
-async function request(path, fallback) {
+// path 로 실제 API 를 호출한다. 기존 GET 호출은 request(path, fallback) 그대로 동작한다.
+// options 로 POST 등 다른 메서드를 쓸 수 있다.
+//   - method: 기본 "GET"
+//   - fallbackOnly: true 면 API_BASE 가 없을 때(목/비연결) fallback 을 쓰지 않고 오류를 던진다.
+//     (데모 호출처럼 "실제 호출이 아니면 예시로 대체하지 않아야" 하는 경우에 사용)
+async function request(path, fallback, options = {}) {
+  const { method = "GET", fallbackOnly = false } = options;
   const base = resolveApiBase();
   // 실제 백엔드가 연결되지 않은 경우 목 데이터 반환 (A안 로컬/목 모드)
   if (!base) {
+    if (fallbackOnly) {
+      // 예시로 대체하면 안 되는 호출(데모). API_BASE 가 없으면 명확히 오류를 던진다.
+      throw new Error("실제 API 가 연결되어 있지 않습니다.");
+    }
     return delay(fallback);
   }
 
@@ -90,7 +100,7 @@ async function request(path, fallback) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${base}${path}`, { headers });
+  const res = await fetch(`${base}${path}`, { method, headers });
 
   // 토큰 없음/잘못됨/만료: 오소라이저가 401/403 으로 거절 → 로그인 안내로 전환
   if (res.status === 401 || res.status === 403) {
@@ -127,6 +137,16 @@ export async function fetchDashboard() {
 export function fetchAiGuide() {
   // Bedrock 재생성 트리거용 (현재는 목)
   return request("/ai-guide", aiGuide);
+}
+
+// 발표용 가상 이상 시연: POST /demo/anomaly.
+// - 사용자가 버튼을 누를 때만 호출한다(이 함수는 자동 재시도를 하지 않는다. 호출부가 1회만 호출).
+// - 본문은 보내지 않는다. 입력은 서버가 고정하므로 클라이언트가 바꾸지 못한다.
+// - 인증 모드에서는 Cognito 액세스 토큰을 Authorization: Bearer 로 첨부한다(request 가 처리).
+// - 실패 시 예시(mock) 가이드로 대체하지 않는다. fallbackOnly:true 로 "실제 호출이 아니면 오류"로 만든다.
+// - 응답 스키마는 /ai-guide 와 동일한 aiGuide + anomalies 배열 + inputKind="virtual".
+export function fetchDemoAnomaly() {
+  return request("/demo/anomaly", null, { method: "POST", fallbackOnly: true });
 }
 
 // 프로필 정보 업데이트
