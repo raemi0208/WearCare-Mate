@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 // 발표용 "가상 이상 시연" 패널.
 //
@@ -15,7 +15,8 @@ import React from "react";
 //  - loading:     요청 진행 중 여부(버튼 비활성화).
 //  - active:      시연 결과가 현재 화면에 적용 중인지(해제 버튼 노출).
 //  - error:       실패 메시지(문자열) 또는 null.
-export default function DemoAnomalyPanel({ onRun, onReset, loading = false, active = false, error = null }) {
+export default function DemoAnomalyPanel({ onRun, onReset, loading = false, active = false, error = null, onSend, canSend = false, sending = false, delivery = null, persistenceWarning = null }) {
+  const [scenario, setScenario] = useState("steps");
   return (
     <section className="card" style={{ padding: 16 }} aria-label="가상 이상 시연">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -26,22 +27,36 @@ export default function DemoAnomalyPanel({ onRun, onReset, loading = false, acti
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <label>시연 시나리오{" "}
+            <select aria-label="시연 시나리오" value={scenario} disabled={loading || sending} onChange={(e) => setScenario(e.target.value)}>
+              <option value="steps">걸음 수 감소</option>
+              <option value="sleep">수면 부족</option>
+              <option value="hrv">HRV 감소</option>
+              <option value="stress">스트레스 증가</option>
+              <option value="multi">수면·HRV·스트레스 다중 지표</option>
+            </select>
+          </label>
           <button
             type="button"
             className="btn btn--primary"
-            onClick={onRun}
-            disabled={loading}
+            onClick={() => onRun(scenario)}
+            disabled={loading || sending}
           >
             {loading ? "AI 분석 중…" : "가상 이상 시연"}
           </button>
 
+          {active && onSend && (
+            <button type="button" className="btn" disabled={!canSend || loading || sending || Boolean(delivery)} onClick={onSend}>
+              {sending ? "발송 요청 중…" : delivery ? "발송 시연 처리됨" : "SNS 이메일 발송 시연"}
+            </button>
+          )}
           {active && (
             <button
               type="button"
               className="btn"
               onClick={onReset}
-              disabled={loading}
+              disabled={loading || sending}
             >
               실제 데이터로 돌아가기
             </button>
@@ -56,6 +71,9 @@ export default function DemoAnomalyPanel({ onRun, onReset, loading = false, acti
         </p>
       )}
 
+      {active && <p className="ui-note" style={{ marginTop: 10 }}>분석만으로는 이메일을 보내지 않습니다. 발송 시연은 기존 SNS 구독 주소로 실제 이메일을 요청하며, 같은 결과는 한 번만 발송합니다.</p>}
+      {delivery && <p className="ui-note" role="status">{delivery.title}{delivery.status === "accepted" ? " · SNS 접수 결과이며 수신함 도착 확인은 별도입니다." : " · 중복 방지를 위해 다시 보내지 않습니다."}</p>}
+      {persistenceWarning && <p className="ui-note" role="status">{persistenceWarning}</p>}
       {error && (
         <p role="alert" style={{ margin: "12px 0 0", color: "var(--color-danger)", fontWeight: 600, fontSize: 13 }}>
           {error}

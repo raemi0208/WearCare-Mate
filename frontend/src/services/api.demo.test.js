@@ -3,7 +3,7 @@
 // - POST 메서드로 호출하고, 인증 모드에서는 액세스 토큰을 Authorization: Bearer 로 붙인다.
 // - 401/403 은 AuthRequiredError(authRequired=true)로 전환한다.
 // - 실패(네트워크·비연결·오류 상태)는 예시로 대체하지 않고 오류를 던진다.
-import { fetchDemoAnomaly, AuthRequiredError } from "./api";
+import { fetchDemoAnomaly, sendDemoEmail, fetchHistory, AuthRequiredError } from "./api";
 
 let mockAuthEnabled = true;
 let mockApiBase = "https://api.example.com";
@@ -78,4 +78,25 @@ test("API_BASE 가 없으면 예시로 대체하지 않고 오류를 던진다",
   global.fetch = jest.fn();
   await expect(fetchDemoAnomaly()).rejects.toThrow(/연결/);
   expect(global.fetch).not.toHaveBeenCalled(); // 실제 호출 없음
+});
+
+
+test("다중 지표 분석은 시나리오만 보내고 발송 요청은 저장된 이벤트만 보낸다", async () => {
+  global.fetch = jest.fn().mockResolvedValue(okResponse(DEMO_BODY));
+  await fetchDemoAnomaly("multi");
+  let opts = global.fetch.mock.calls[0][1];
+  expect(JSON.parse(opts.body)).toEqual({scenario: "multi"});
+  expect(opts.headers["Content-Type"]).toBe("application/json");
+  await sendDemoEmail("saved-event");
+  opts = global.fetch.mock.calls[1][1];
+  expect(JSON.parse(opts.body)).toEqual({action: "send", eventId: "saved-event"});
+  expect(opts.headers.Authorization).toBe("Bearer demo-token");
+});
+
+test("영구 저장 내역 조회는 인증된 GET이며 분석이나 이메일을 요청하지 않는다", async () => {
+  global.fetch = jest.fn().mockResolvedValue(okResponse({guideHistory: [], notifications: []}));
+  await fetchHistory("cursor=");
+  expect(global.fetch.mock.calls[0][0]).toBe("https://api.example.com/history?cursor=cursor%3D");
+  expect(global.fetch.mock.calls[0][1].method).toBe("GET");
+  expect(global.fetch.mock.calls[0][1].body).toBeUndefined();
 });

@@ -1,12 +1,14 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import App from "./App";
-import { fetchDashboard, fetchAiGuide, fetchDemoAnomaly } from "./services/api";
+import { fetchDashboard, fetchAiGuide, fetchDemoAnomaly, sendDemoEmail, fetchHistory } from "./services/api";
 
 jest.mock("./services/api", () => ({
   fetchDashboard: jest.fn(),
   fetchAiGuide: jest.fn(),
   fetchDemoAnomaly: jest.fn(),
+  sendDemoEmail: jest.fn(),
+  fetchHistory: jest.fn(),
   updateProfile: jest.fn(),
 }));
 
@@ -236,4 +238,30 @@ test("시연 기준일 전환과 실제 집계·차트 보존을 확인한다", 
   expect(
     screen.getByLabelText("시계열 추이 라인 차트").outerHTML
   ).toBe(originalChart);
+});
+
+
+test("다중 지표 결과를 저장하고 명시적 발송 버튼에서만 요청하며 재진입 시 내역이 유지된다", async () => {
+  const savedGuide = {id: "saved", date: "2026-11-14", tag: "가상 시연 · 다중 지표", headline: "저장된 다중 지표 가이드"};
+  fetchDemoAnomaly.mockResolvedValue({...demoResponse, eventId: "saved", scenario: "multi", persistenceStatus: "saved", historyStatus: "ok", guideHistory: [savedGuide], notifications: []});
+  const notice = {id: "saved", title: "가상 시연 이메일 · SNS 발송 요청 접수", status: "accepted", time: "2026-11-10"};
+  sendDemoEmail.mockResolvedValue({notification: notice, historyStatus: "ok", guideHistory: [savedGuide], notifications: [notice]});
+  const view = render(<App />);
+  await screen.findByText("평균 걸음 수");
+  fireEvent.change(screen.getByLabelText("시연 시나리오"), {target: {value: "multi"}});
+  fireEvent.click(screen.getByRole("button", {name: "가상 이상 시연"}));
+  await screen.findByText("생성형 AI");
+  expect(fetchDemoAnomaly).toHaveBeenCalledWith("multi");
+  expect(sendDemoEmail).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", {name: "SNS 이메일 발송 시연"}));
+  await waitFor(() => expect(sendDemoEmail).toHaveBeenCalledWith("saved"));
+  await waitFor(() => expect(screen.getByRole("button", {name: "발송 시연 처리됨"})).toBeDisabled());
+  expect(screen.getByText(notice.title)).toBeInTheDocument();
+  view.unmount();
+  fetchDashboard.mockResolvedValue({...dashboard, guideHistory: [savedGuide], notifications: [notice], historyStatus: "ok"});
+  render(<App />);
+  await screen.findByText(notice.title);
+  fireEvent.click(screen.getByRole("button", {name: /AI 가이드/}));
+  expect(await screen.findByText(savedGuide.headline)).toBeInTheDocument();
+  expect(sendDemoEmail).toHaveBeenCalledTimes(1);
 });

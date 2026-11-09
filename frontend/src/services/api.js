@@ -78,7 +78,7 @@ function delay(data, ms = 350) {
 //   - fallbackOnly: true 면 API_BASE 가 없을 때(목/비연결) fallback 을 쓰지 않고 오류를 던진다.
 //     (데모 호출처럼 "실제 호출이 아니면 예시로 대체하지 않아야" 하는 경우에 사용)
 async function request(path, fallback, options = {}) {
-  const { method = "GET", fallbackOnly = false } = options;
+  const { method = "GET", fallbackOnly = false, body } = options;
   const base = resolveApiBase();
   // 실제 백엔드가 연결되지 않은 경우 목 데이터 반환 (A안 로컬/목 모드)
   if (!base) {
@@ -100,7 +100,8 @@ async function request(path, fallback, options = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${base}${path}`, { method, headers });
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const res = await fetch(`${base}${path}`, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
 
   // 토큰 없음/잘못됨/만료: 오소라이저가 401/403 으로 거절 → 로그인 안내로 전환
   if (res.status === 401 || res.status === 403) {
@@ -141,12 +142,22 @@ export function fetchAiGuide() {
 
 // 발표용 가상 이상 시연: POST /demo/anomaly.
 // - 사용자가 버튼을 누를 때만 호출한다(이 함수는 자동 재시도를 하지 않는다. 호출부가 1회만 호출).
-// - 본문은 보내지 않는다. 입력은 서버가 고정하므로 클라이언트가 바꾸지 못한다.
+// - 시나리오 식별자만 보낸다. 지표 값은 서버에서 고정한다.
 // - 인증 모드에서는 Cognito 액세스 토큰을 Authorization: Bearer 로 첨부한다(request 가 처리).
 // - 실패 시 예시(mock) 가이드로 대체하지 않는다. fallbackOnly:true 로 "실제 호출이 아니면 오류"로 만든다.
 // - 응답 스키마는 /ai-guide 와 동일한 aiGuide + anomalies 배열 + inputKind="virtual".
-export function fetchDemoAnomaly() {
-  return request("/demo/anomaly", null, { method: "POST", fallbackOnly: true });
+export function fetchDemoAnomaly(scenario) {
+  return request("/demo/anomaly", null, { method: "POST", fallbackOnly: true,
+    ...(scenario ? { body: { scenario } } : {}) });
+}
+
+export function sendDemoEmail(eventId) {
+  return request("/demo/anomaly", null, { method: "POST", fallbackOnly: true,
+    body: { action: "send", eventId } });
+}
+
+export function fetchHistory(cursor) {
+  return request(`/history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`, null, { fallbackOnly: true });
 }
 
 // 프로필 정보 업데이트

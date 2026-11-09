@@ -38,7 +38,7 @@ export default function AnomalyPage({ data, demoActive = false, demoReferenceDat
         <div className="card stat">
           <div className="stat__label">분석 엔진</div>
           <div className="stat__value" style={{ fontSize: 18 }}>
-            {data.analysis ? "활동량 기준선" : "예시 분석"}
+            {demoActive && data.demoScenario && data.demoScenario !== "steps" ? "집단 지표 기준선" : data.analysis ? "활동량 기준선" : "예시 분석"}
           </div>
           <div className="stat__delta is-flat">{displayReferenceDate || "예시 데이터"}</div>
         </div>
