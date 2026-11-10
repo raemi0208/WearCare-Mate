@@ -1,17 +1,13 @@
 import React from "react";
 import Card from "./ui/Card";
 import Badge from "./ui/Badge";
+import SleepMetrics from "./SleepMetrics";
 
-export default function SleepStages({ sleepStages }) {
+export default function SleepStages({ sleepStages = {totalLabel: "", segments: []}, sleepSummary }) {
+  if (sleepSummary !== undefined) return <SleepMetrics summary={sleepSummary} />;
   const { totalLabel, segments } = sleepStages;
 
-  if (segments.length === 0) {
-    return (
-      <Card title="수면 단계 분석" action={<Badge variant="ghost">정보 미제공</Badge>}>
-        <p className="ui-note" role="status">현재 데이터셋은 수면 단계 정보를 제공하지 않습니다.</p>
-      </Card>
-    );
-  }
+  if (segments.length === 0) return <SleepMetrics />;
 
   return (
     <Card

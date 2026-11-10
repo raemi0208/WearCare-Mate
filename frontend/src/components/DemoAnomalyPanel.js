@@ -32,6 +32,7 @@ export default function DemoAnomalyPanel({ onRun, onReset, loading = false, acti
             <select aria-label="시연 시나리오" value={scenario} disabled={loading || sending} onChange={(e) => setScenario(e.target.value)}>
               <option value="steps">걸음 수 감소</option>
               <option value="sleep">수면 부족</option>
+              <option value="restless">수면 중 움직임 증가</option>
               <option value="hrv">HRV 감소</option>
               <option value="stress">스트레스 증가</option>
               <option value="multi">수면·HRV·스트레스 다중 지표</option>

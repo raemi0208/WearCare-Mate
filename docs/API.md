@@ -9,7 +9,7 @@
 
 ## 현재 시연·저장 요청
 
-- 분석: `POST /demo/anomaly`, JSON `{ "scenario": "steps|sleep|hrv|stress|multi" }`.
+- 분석: `POST /demo/anomaly`, JSON `{ "scenario": "steps|sleep|restless|hrv|stress|multi" }`.
 - 실제 SNS 메일: 같은 POST에 `{ "action": "send", "eventId": "분석 응답 eventId" }`.
   기존 구독자에게 저장된 가이드만 발송합니다. 주소·본문은 클라이언트에서 지정하지 않습니다.
 - 알림 목록 삭제: 같은 POST에 `{ "action": "hide_notification", "eventId": "알림 id" }`.
@@ -301,3 +301,11 @@ AI 건강 가이드만 다시 생성합니다. (대시보드의 "가이드 다�
 2. **시계열 저장·이상 탐지** — Athena 저장, AI/ML Lambda 평소 패턴 학습/이상 탐지 → `anomalies`, `timeseries[].anomaly`
 3. **AI 가이드 생성** — Bedrock → `aiGuide`
 4. **알림·웹 서빙** — SNS 푸시(`notifications`), Vercel 웹 대시보드가 `GET /dashboard`로 취합 조회
+
+## 수면 관련 지표 확장
+
+수면 단계 대신 `sleepDatasetSummary`의 평균 수면 시간과 수면 중 움직임을 표시합니다.
+추가 필드: `averageMovement`(수치 또는 null), `movementRecordCount`(건수 또는 null),
+`movementStatus`(ok/empty/unavailable/error), `movementUnit`(현재 null).
+움직임 값은 유효 수면 시간 기록 중 0 이상인 값만 집계하며, 횟수·수면 단계 비율로 해석하지 않습니다.
+가상 시연 `restless`는 고정 입력 movement_during_sleep=6.0으로 실제 AI/ML의 SLEEP_RESTLESS 판정을 확인합니다.

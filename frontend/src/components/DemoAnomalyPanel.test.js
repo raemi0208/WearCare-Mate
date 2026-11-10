@@ -28,3 +28,11 @@ test("선택 상자의 접근성 이름은 유지하고 앞의 가시 문구는 
   expect(screen.getByLabelText("시연 시나리오")).toBeInTheDocument();
   expect(screen.queryByText("시연 시나리오")).not.toBeInTheDocument();
 });
+
+test("수면 중 움직임 증가는 별도 가상 시나리오로 선택할 수 있다", () => {
+  const run = jest.fn();
+  render(<DemoAnomalyPanel onRun={run} />);
+  fireEvent.change(screen.getByLabelText("시연 시나리오"), {target:{value:"restless"}});
+  fireEvent.click(screen.getByRole("button", {name:"가상 이상 시연"}));
+  expect(run).toHaveBeenCalledWith("restless");
+});

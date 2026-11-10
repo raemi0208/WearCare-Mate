@@ -33,7 +33,7 @@ export default function DashboardPage({ data, onRegenerate, regenerating, demoAc
       <div className="grid grid--main">
         <div className="grid">
           <TrendChart timeseries={data.timeseries} />
-          <SleepStages sleepStages={data.sleepStages} />
+          <SleepStages sleepStages={data.sleepStages} sleepSummary={data.sleepDatasetSummary} />
           <AnomalyPanel
             anomalies={data.anomalies}
             analysis={data.analysis}

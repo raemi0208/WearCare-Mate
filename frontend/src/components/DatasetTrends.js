@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Card from "./ui/Card";
 import Badge from "./ui/Badge";
 import LineChart from "./ui/LineChart";
+import SleepMetrics from "./SleepMetrics";
 
 // 발표용 "별도 데이터셋" 추이 (추이 분석 페이지의 실제 모드 전용).
 //
@@ -340,9 +341,7 @@ export default function DatasetTrends({ sleepSummary, heartSummary }) {
       <SleepDistribution sleepSummary={sleepSummary} />
       <HeartDaily heartSummary={heartSummary} />
 
-      <Card title="수면 단계 분석" action={datasetBadge}>
-        <p className="ui-note" role="status">현재 데이터셋은 수면 단계 정보를 제공하지 않습니다.</p>
-      </Card>
+      <SleepMetrics summary={sleepSummary} />
     </div>
   );
 }
