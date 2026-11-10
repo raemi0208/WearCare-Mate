@@ -420,3 +420,33 @@ class DatasetSummaryEnableTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SleepMovementSummaryTest(unittest.TestCase):
+    def summary(self, count, average):
+        columns = SLEEP_COLS + ["movement_count", "average_movement"]
+        client = FakeSummaryClient([result_page(columns, SLEEP_OK_VALUES + [count, average])])
+        result = dataset_summary._sleep_summary(client, dataset_summary._summary_config(ENV))
+        self.assertIn("TRY_CAST(movement_during_sleep AS double) >= 0", client.started_sql[0])
+        self.assertIn(dataset_summary.SLEEP_PATH, client.started_sql[0])
+        return result
+
+    def test_movement_average_and_count_come_from_query(self):
+        result = self.summary("970", "2.01346")
+        self.assertEqual(result["averageMovement"], 2.013)
+        self.assertEqual(result["movementRecordCount"], 970)
+        self.assertEqual(result["movementStatus"], "ok")
+        self.assertIsNone(result["movementUnit"])
+
+    def test_no_movement_records_is_not_zero_average(self):
+        result = self.summary("0", None)
+        self.assertIsNone(result["averageMovement"])
+        self.assertEqual(result["movementStatus"], "empty")
+        self.assertEqual(result["status"], "ok")
+
+    def test_invalid_movement_does_not_destroy_valid_sleep_duration(self):
+        for count, average in [("1001", "2"), ("2", "NaN"), ("2", "-1")]:
+            result = self.summary(count, average)
+            self.assertEqual(result["movementStatus"], "error")
+            self.assertIsNone(result["averageMovement"])
+            self.assertEqual(result["averageHours"], 7.47)

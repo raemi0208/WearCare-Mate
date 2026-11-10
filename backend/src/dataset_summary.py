@@ -22,6 +22,7 @@ status 값:
 """
 
 import logging
+import math
 import os
 import re
 import time
@@ -271,6 +272,10 @@ def _sleep_summary(client, config):
         "AVG(TRY_CAST(sleep_duration_hours AS double)) AS average_hours, "
         "MIN(TRY_CAST(sleep_duration_hours AS double)) AS minimum_hours, "
         "MAX(TRY_CAST(sleep_duration_hours AS double)) AS maximum_hours, "
+        "AVG(CASE WHEN TRY_CAST(movement_during_sleep AS double) >= 0 "
+        "THEN TRY_CAST(movement_during_sleep AS double) END) AS average_movement, "
+        "SUM(CASE WHEN TRY_CAST(movement_during_sleep AS double) >= 0 "
+        "THEN 1 ELSE 0 END) AS movement_count, "
         f"{bucket_expressions} "
         f'FROM "{config.database}"."{SLEEP_TABLE}" '
         f"WHERE \"$path\" = '{path}' "
@@ -294,6 +299,7 @@ def _sleep_summary(client, config):
             "minimumHours": None,
             "maximumHours": None,
             "distribution": [],
+            "averageMovement": None, "movementRecordCount": 0, "movementStatus": "empty", "movementUnit": None,
         }
 
     average = _to_float(row.get("average_hours"))
@@ -309,6 +315,22 @@ def _sleep_summary(client, config):
         raise DataSourceUnavailableError(
             "수면 요약 통계가 올바르지 않습니다."
         )
+
+    movement_count = _to_int(row.get("movement_count"))
+    movement = _to_float(row.get("average_movement"))
+    movement_status = "unavailable"
+    if movement_count is not None:
+        if movement_count == 0 and movement is None:
+            movement_status = "empty"
+        elif (0 < movement_count <= count and movement is not None
+              and math.isfinite(movement) and movement >= 0):
+            movement_status = "ok"
+        else:
+            movement_status = "error"
+    if movement_status != "ok":
+        movement = None
+    if movement_status in ("error", "unavailable"):
+        movement_count = None
 
     distribution = []
     bucket_total = 0
@@ -345,6 +367,8 @@ def _sleep_summary(client, config):
         "minimumHours": round(minimum, 2),
         "maximumHours": round(maximum, 2),
         "distribution": distribution,
+        "averageMovement": round(movement, 3) if movement is not None else None,
+        "movementRecordCount": movement_count, "movementStatus": movement_status, "movementUnit": None,
     }
 
 # 확인된 날짜 형식: YYYY-MM-DD

@@ -75,6 +75,7 @@ def is_demo_anomaly_enabled(environ=None):
 SCENARIOS = {
     "steps": ("걸음 수 감소", {}),
     "sleep": ("수면 부족", {"sleep_hours": 3.0}),
+    "restless": ("수면 중 움직임 증가", {"movement_during_sleep": 6.0}),
     "hrv": ("HRV 감소", {"heart_rate_variability": 15.0}),
     "stress": ("스트레스 증가", {"stress_level": 10.0}),
     "multi": ("다중 지표", {"sleep_hours": 3.0, "heart_rate_variability": 15.0, "stress_level": 10.0}),

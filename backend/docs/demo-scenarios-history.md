@@ -1,7 +1,7 @@
 # 가상 이상 시연과 영구 보관
 
 - 기준일: 2026-11-14. 실제 Fitbit 기록의 2016-04-10 기준일은 바꾸지 않습니다.
-- POST /demo/anomaly: `{ "scenario": "steps|sleep|hrv|stress|multi" }`.
+- POST /demo/anomaly: `{ "scenario": "steps|sleep|restless|hrv|stress|multi" }`.
 - steps: 걸음 수 1,000, 기록 시간 800분. 나머지 시나리오의 걸음 수는 정상 기준 10,000.
 - sleep: 수면 3시간, hrv: HRV 15, stress: 스트레스 10. multi는 세 지표 동시 입력.
 - 값은 서버에서 고정합니다. 실제 데이터셋이나 개인 진단 결과가 아닙니다. 분석 호출은 항상 notify=false입니다.
@@ -34,3 +34,13 @@ POST /demo/anomaly에 `{ "action": "hide_notification", "eventId": "..." }`를 �
 로그인 계정의 해당 알림만 목록에서 숨깁니다. notificationHidden 속성만 갱신하며,
 가이드·원본 발송 결과·중복 발송 방지 기록은 유지합니다. 이메일을 회수하거나 재발송을 허용하지 않습니다.
 실제 메일 발송 버튼 표시는 `SNS 메일 발송`입니다. 분석·조회는 발송하지 않고 버튼에서만 기존 구독자에게 발송합니다.
+
+## 수면 관련 지표
+
+수면 단계(REM/깊은 수면/얕은 수면) 비율은 원본 CSV에 없어 생성하지 않습니다.
+화면은 별도 수면 데이터셋의 평균 수면 시간과 평균 수면 중 움직임을 표시합니다.
+`averageMovement`, `movementRecordCount`, `movementStatus`, `movementUnit`을 sleepDatasetSummary에 추가합니다.
+유효 수면 시간(0~24시간) 기록 중 숫자로 변환 가능한 0 이상 움직임 값만 집계하고,
+음수·누락 값은 제외합니다. 단위 미확인이므로 횟수로 표시하지 않습니다.
+`restless` 시나리오는 movement_during_sleep=6.0의 고정 가상 입력이며 SLEEP_RESTLESS 판정을 시연합니다.
+기존 multi 시나리오는 수면·HRV·스트레스 3개 조합을 유지합니다. 움직임은 별도 선택 항목입니다.

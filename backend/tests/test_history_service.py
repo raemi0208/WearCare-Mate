@@ -71,14 +71,14 @@ class HistoryFlowTest(unittest.TestCase):
         return h.handle_demo(event({'scenario': 'multi'}, subject), MemoryStore, self.runner)
 
     def test_scenarios_are_server_fixed_and_analysis_never_sends(self):
-        expected = {'sleep': 'sleep_hours', 'hrv': 'heart_rate_variability', 'stress': 'stress_level'}
+        expected = {'sleep': 'sleep_hours', 'hrv': 'heart_rate_variability', 'stress': 'stress_level', 'restless': 'movement_during_sleep'}
         for scenario, metric in expected.items():
             request = build_demo_request(scenario)
             self.assertIn(metric, request['metrics'])
             self.assertEqual(request['metrics']['steps'], 10000)
             self.assertIs(request['notify'], False)
         request = build_demo_request('multi')
-        self.assertTrue(set(expected.values()) <= set(request['metrics']))
+        self.assertTrue({'sleep_hours', 'heart_rate_variability', 'stress_level'} <= set(request['metrics']))
         request['metrics']['sleep_hours'] = 99
         self.assertEqual(build_demo_request('multi')['metrics']['sleep_hours'], 3)
 
