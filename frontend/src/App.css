@@ -1049,3 +1049,314 @@
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
 }
+
+/* 건강 앱 연동 / 일일 리포트 알림 */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(20, 20, 20, 0.45);
+}
+
+.modal {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--space-5);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.modal__title {
+  margin: 0 0 var(--space-4);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.modal__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) 0;
+  color: var(--color-muted);
+}
+
+.provider-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.provider-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+/* '기타(Other)' 선택지는 한 줄 전체 너비로 표시 */
+.provider-option--wide {
+  grid-column: 1 / -1;
+}
+
+.provider-option:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-panel);
+}
+
+.provider-option__icon {
+  font-size: 28px;
+}
+
+.provider-option__name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.provider-option__desc {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-ink);
+  border-radius: 50%;
+  animation: spinner-rotate 0.8s linear infinite;
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.health-link__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.health-link__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.report-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-panel);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.report-progress {
+  height: 8px;
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.report-progress__bar {
+  height: 100%;
+  background: var(--color-ink);
+}
+
+.report-toast {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 110;
+  width: 320px;
+  max-width: calc(100vw - 2 * var(--space-4));
+  padding: var(--space-4);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.report-toast__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.report-toast__line {
+  margin: 0 0 var(--space-1);
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .provider-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+/* ===== 건강 앱 연동 상세 / 다중 연동 / 블루투스 기기 ===== */
+.health-link-main-note {
+  margin-top: 0;
+}
+.health-link-list {
+  display: grid;
+  gap: var(--space-3);
+}
+.health-link-row {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+.health-link-row.is-main {
+  border-color: var(--color-border-strong);
+}
+.health-link-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.health-link-add {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+.health-link-more {
+  margin-top: var(--space-3);
+}
+.health-link-more summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.health-link-notes {
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-4);
+  font-size: 13px;
+  color: var(--color-ink-soft);
+}
+.health-link-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.health-link-steps .is-current {
+  color: var(--color-ink);
+  font-weight: 700;
+}
+.health-link-steps .is-done {
+  color: var(--color-ok);
+}
+.health-link-details {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.health-link-details__title {
+  margin: 0 0 var(--space-2);
+  font-size: 14px;
+}
+.health-link-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.health-link-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-panel);
+  border-radius: var(--radius-md);
+}
+.health-link-item__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.health-link-item__label {
+  font-weight: 600;
+}
+.health-link-item__desc,
+.health-link-item__sample {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.health-link-item__value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-weight: 700;
+}
+.bt-device-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-panel);
+  border-radius: var(--radius-md);
+}
+.bt-device-panel__title {
+  margin: 0 0 var(--space-2);
+  font-size: 14px;
+}
+.bt-device-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.bt-device {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.bt-device__info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.bt-device__name {
+  font-weight: 600;
+}
+.bt-device__meta {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.confirm-dialog__desc {
+  margin: 0 0 var(--space-4);
+  font-size: 14px;
+  text-align: center;
+}
+.main-app-badge {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+}

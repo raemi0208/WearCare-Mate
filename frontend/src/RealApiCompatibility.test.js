@@ -35,7 +35,7 @@ test("real empty datasets render through all pages without infinite statistics",
   await screen.findByText("평균 걸음 수");
   expect(screen.queryByText("● 실시간 동기화")).not.toBeInTheDocument();
   expect(screen.getByText("활동량 판정")).toBeInTheDocument();
-  for (const label of ["추이 분석", "이상 탐지", "AI 가이드", "기기 연동", "설정"]) {
+  for (const label of ["추이 분석", "이상 탐지", "AI 가이드", "건강 앱 연동", "설정"]) {
     fireEvent.click(screen.getByRole("button", { name: new RegExp(label) }));
     expect(container.textContent).not.toMatch(/Infinity|NaN|undefined/);
   }

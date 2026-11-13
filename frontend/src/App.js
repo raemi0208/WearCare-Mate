@@ -36,7 +36,7 @@ const PAGE_META = {
     subtitle: "Amazon Bedrock 생성형 AI 맞춤 가이드",
   },
   devices: {
-    title: "기기 연동",
+    title: "건강 앱 연동",
     subtitle: "연결된 웨어러블 기기 및 데이터 수집 상태",
   },
   settings: {

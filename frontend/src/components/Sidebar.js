@@ -5,7 +5,7 @@ const NAV = [
   { id: "trends", icon: "📈", label: "추이 분석" },
   { id: "anomaly", icon: "⚠", label: "이상 탐지" },
   { id: "guide", icon: "💬", label: "AI 가이드" },
-  { id: "devices", icon: "⌚", label: "기기 연동" },
+  { id: "devices", icon: "⌚", label: "건강 앱 연동" },
   { id: "settings", icon: "⚙", label: "설정" },
 ];
 
