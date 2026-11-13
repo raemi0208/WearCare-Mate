@@ -28,7 +28,7 @@ test("dataset charts show actual supplied aggregates and omit unconfirmed units"
   expect(screen.getByText("7.47시간")).toBeInTheDocument();
   expect(screen.getByRole("img", {name: "수면 시간 구간별 건수 막대차트"})).toBeInTheDocument();
   expect(screen.queryByText(/bpm/i)).not.toBeInTheDocument();
-  const button = screen.getByRole("button", {name: "날짜별 포함 건수 보기"});
+  const button = screen.getByRole("button", {name: "날짜별 평균과 기록 수 보기"});
   expect(button).toHaveAttribute("aria-expanded", "false");
   fireEvent.click(button);
   expect(button).toHaveAttribute("aria-expanded", "true");

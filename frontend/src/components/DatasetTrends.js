@@ -244,49 +244,41 @@ function HeartDaily({ heartSummary }) {
   const overall = isFiniteNumber(heartSummary.averageValue)
     ? heartSummary.averageValue
     : null;
-  const basisText =
-    heartSummary.averageBasis === "positive"
-      ? "0 이하 값 제외(양수 heart_rate 행 평균)"
-      : heartSummary.averageBasis === "all"
-      ? "전체 행 평균"
-      : "기준 미상";
+  const basisText = {
+    positive: "전체 평균은 0보다 큰 모든 심박 기록으로 계산했어요.",
+    all: "전체 평균은 모든 심박 기록으로 계산했어요.",
+  }[heartSummary.averageBasis];
 
   return (
     <Card icon="❤️" title="날짜별 평균 심박" action={datasetBadge}>
       <div className="trend-stats">
         <div className="trend-stat">
-          <span className="trend-stat__label">전체 대표 평균</span>
+          <span className="trend-stat__label">전체 평균 심박</span>
           <span className="trend-stat__value">
             {overall != null ? `${overall}${unitSuffix}` : "—"}
           </span>
         </div>
         <div className="trend-stat">
-          <span className="trend-stat__label">양수 행 수</span>
+          <span className="trend-stat__label">0보다 큰 기록</span>
           <span className="trend-stat__value">
             {isNonNegativeInt(heartSummary.positiveRows)
               ? heartSummary.positiveRows.toLocaleString()
               : "—"}
-            <span className="trend-stat__unit">행</span>
-          </span>
-        </div>
-        <div className="trend-stat">
-          <span className="trend-stat__label">날짜 파싱 실패</span>
-          <span className="trend-stat__value">
-            {isNonNegativeInt(heartSummary.invalidDateRows)
-              ? heartSummary.invalidDateRows.toLocaleString()
-              : "—"}
-            <span className="trend-stat__unit">행</span>
+            <span className="trend-stat__unit">건</span>
           </span>
         </div>
       </div>
 
-      <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "0 0 8px" }}>
-        {DATASET_DESC} 전체 대표 평균은 {basisText} 기준이고, 아래 날짜별 평균은 날짜마다
-        heart_rate > 0 인 행만 평균한 값이라 집계 기준이 다를 수 있습니다.
-        {!hasUnit && " 단위 미확인이라 수치만 표시합니다."}
-      </p>
+      <p className="ui-note">점 하나는 그날 기록의 평균이에요. 공개 자료에서 집계한 값입니다.</p>
 
       <LineChart data={chartData} />
+
+      <details className="ui-note" style={{ margin: "8px 0 0" }}>
+        <summary>평균 계산 기준</summary>
+        {basisText && <p>{basisText}</p>}
+        <p>날짜별 평균은 날짜를 확인할 수 있고 값이 0보다 큰 기록으로 계산했어요.</p>
+        {!hasUnit && <p>자료에서 측정 단위를 확인할 수 없어 숫자만 표시했어요.</p>}
+      </details>
 
       <button
         type="button"
@@ -295,7 +287,7 @@ function HeartDaily({ heartSummary }) {
         onClick={() => setShowRows((v) => !v)}
         aria-expanded={showRows}
       >
-        {showRows ? "날짜별 포함 건수 접기" : "날짜별 포함 건수 보기"}
+        {showRows ? "날짜별 기록 접기" : "날짜별 평균과 기록 수 보기"}
       </button>
 
       {showRows && (
@@ -307,7 +299,7 @@ function HeartDaily({ heartSummary }) {
                 <th style={{ textAlign: "right", padding: "6px 8px" }}>
                   평균{unitText ? ` (${unitText})` : ""}
                 </th>
-                <th style={{ textAlign: "right", padding: "6px 8px" }}>포함 건수</th>
+                <th style={{ textAlign: "right", padding: "6px 8px" }}>평균에 사용한 기록</th>
               </tr>
             </thead>
             <tbody>
