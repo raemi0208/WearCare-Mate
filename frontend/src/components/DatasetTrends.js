@@ -4,9 +4,9 @@ import Badge from "./ui/Badge";
 import LineChart from "./ui/LineChart";
 import SleepMetrics from "./SleepMetrics";
 
-// 발표용 "별도 데이터셋" 추이 (추이 분석 페이지의 실제 모드 전용).
+// 발표용 "공개 데이터셋" 추이 (추이 분석 페이지의 실제 모드 전용).
 //
-// ⚠ 이 영역은 Fitbit 시연 사용자(걸음 수·가상 이상 시연)와 "연결되지 않은" 별도 데이터셋이다.
+// ⚠ 이 영역은 Fitbit 시연 사용자(걸음 수·가상 이상 시연)와 "연결되지 않은" 공개 데이터셋이다.
 //   개인별 timeseries.sleep / heartRate 를 채우지 않고, 데이터셋 집계(dataset_summary)만 표시한다.
 //
 // props:
@@ -16,8 +16,8 @@ import SleepMetrics from "./SleepMetrics";
 // 상태 구분: status 없음/empty/error 는 안내만, ok 라도 확장 필드(distribution/dailySeries)가
 //   없으면 '확장 집계 미제공'으로 안내한다(이전 배포 API 호환). 목 데이터로 대체하지 않는다.
 
-const DATASET_BADGE = "별도 데이터셋";
-const DATASET_DESC = "Fitbit 시연 사용자 기록과 연결되지 않은 별도 데이터셋입니다.";
+const DATASET_BADGE = "공개 데이터셋";
+const DATASET_DESC = "Fitbit 시연 사용자 기록과 연결되지 않은 공개 데이터셋입니다.";
 
 // status 기반 공통 안내(ok 면 null). 확장 필드 유무는 각 섹션에서 별도로 판단한다.
 function statusMessage(summary) {

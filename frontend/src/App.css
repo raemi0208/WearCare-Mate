@@ -1004,3 +1004,17 @@
     grid-column: 1 / -1;
   }
 }
+.dataset-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.dataset-summary__metric {
+  display: grid;
+  gap: 2px;
+}
+
+.dataset-summary__metric strong {
+  font-size: 20px;
+  line-height: 1.3;
+}

@@ -19,7 +19,7 @@ const okData = {
   },
 };
 
-test("세 데이터셋 카드가 실제 집계값과 별도 데이터셋 배지를 표시한다", () => {
+test("세 데이터셋 카드가 실제 집계값과 공개 데이터셋 배지를 표시한다", () => {
   render(<DatasetSummaryCards data={okData} />);
   // 수면
   expect(screen.getByText("수면 데이터셋")).toBeInTheDocument();
@@ -27,16 +27,16 @@ test("세 데이터셋 카드가 실제 집계값과 별도 데이터셋 배지�
   expect(screen.getByText(/집계 기록 수 1,000건/)).toBeInTheDocument();
   // 심박: 행 수 중심
   expect(screen.getByText("심박 데이터셋")).toBeInTheDocument();
-  expect(screen.getByText("30,000")).toBeInTheDocument();
-  expect(screen.getByText("29,794")).toBeInTheDocument();
-  expect(screen.getByText(/양수 값 평균 79.9 bpm/)).toBeInTheDocument();
+  expect(screen.getByText("전체 기록 30,000건")).toBeInTheDocument();
+  expect(screen.getByText(/29,794건으로 평균/)).toBeInTheDocument();
+  expect(screen.getByText("79.9 bpm")).toBeInTheDocument();
   // 심리상담: 파일별 행 수
   expect(screen.getByText("심리상담 데이터셋")).toBeInTheDocument();
-  expect(screen.getByText("통합 데이터셋")).toBeInTheDocument();
-  expect(screen.getByText("1,328")).toBeInTheDocument();
-  expect(screen.getByText("175")).toBeInTheDocument();
+  expect(screen.getByText("모아서 정리한 자료")).toBeInTheDocument();
+  expect(screen.getByText("1,328건")).toBeInTheDocument();
+  expect(screen.getByText("175건")).toBeInTheDocument();
   // 별도 데이터셋 배지 3개
-  expect(screen.getAllByText("별도 데이터셋")).toHaveLength(3);
+  expect(screen.getAllByText("공개 데이터셋")).toHaveLength(3);
 });
 
 test("실패/빈 결과는 0 이 아니라 안내 문구로 표시된다", () => {
@@ -55,7 +55,7 @@ test("실패/빈 결과는 0 이 아니라 안내 문구로 표시된다", () =>
   expect(container.textContent).not.toMatch(/0시간/);
   expect(container.textContent).not.toMatch(/전체 기록 0행/);
   // 정상인 심리상담은 계속 표시
-  expect(screen.getByText("1,328")).toBeInTheDocument();
+  expect(screen.getByText("1,328건")).toBeInTheDocument();
 });
 
 test("세 필드가 모두 없으면 섹션을 렌더하지 않는다", () => {
@@ -72,5 +72,6 @@ test("심박 평균 근거가 전체 평균이면 라벨이 바뀐다", () => {
   };
   render(<DatasetSummaryCards data={data} />);
   const card = screen.getByText("심박 데이터셋").closest(".card");
-  expect(within(card).getByText(/전체 평균 70.1 bpm/)).toBeInTheDocument();
+  expect(within(card).getByText("전체 평균 심박수")).toBeInTheDocument();
+  expect(within(card).getByText("70.1 bpm")).toBeInTheDocument();
 });
