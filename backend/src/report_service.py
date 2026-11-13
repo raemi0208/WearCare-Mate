@@ -4,7 +4,7 @@ import base64
 import hashlib
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from botocore.config import Config
 from botocore.exceptions import ClientError
@@ -30,6 +30,31 @@ def _public(item, day):
     }
 
 
+def _record_key(owner, day):
+    return {**_key(owner), "sk": _s("DAILY_RECORD#" + day)}
+
+
+def _report(db, args, item, day):
+    start = (day - timedelta(days=29)).isoformat()
+    end = day.isoformat()
+    rows = {}
+    for page in db.get_paginator("query").paginate(
+        TableName=args["TableName"], ConsistentRead=True,
+        KeyConditionExpression="pk = :pk AND sk BETWEEN :start AND :end",
+        ExpressionAttributeValues={":pk": args["Key"]["pk"],
+                                   ":start": _s("DAILY_RECORD#" + start),
+                                   ":end": _s("DAILY_RECORD#" + end)},
+    ):
+        for row in page["Items"]:
+            rows[row["sk"]["S"].split("#", 1)[1]] = json.loads(row["record"]["S"])
+    previous = item.get("recordDate", {}).get("S", "")
+    if start <= previous <= end and "record" in item:
+        rows[previous] = json.loads(item["record"]["S"])
+    return {**_public(item, end),
+            "records": [{"date": key, **rows[key]} for key in sorted(rows)],
+            "date": end}
+
+
 def handle_report(event, method):
     owner = principal(event)
     table = os.environ.get("HISTORY_TABLE")
@@ -41,7 +66,7 @@ def handle_report(event, method):
     args = {"TableName": table, "Key": _key(owner)}
     if method == "GET":
         item = db.get_item(**args, ConsistentRead=True).get("Item", {})
-        return _public(item, day.isoformat())
+        return _report(db, args, item, day)
 
     try:
         raw = event.get("body") or ""
@@ -63,9 +88,26 @@ def handle_report(event, method):
         raise HistoryError(400, "invalid_report") from None
 
     if "record" in body:
-        expression = "SET recordDate = :day, #record = :record"
-        values = {":day": _s(day.isoformat()), ":record": _s(json.dumps(body["record"]))}
-        args["ExpressionAttributeNames"] = {"#record": "record"}
+        existing = db.get_item(**args, ConsistentRead=True).get("Item", {})
+        previous = existing.get("recordDate", {}).get("S")
+        if previous and previous < day.isoformat() and "record" in existing:
+            try:
+                db.put_item(TableName=table, Item={
+                    **_record_key(owner, previous), "record": existing["record"]},
+                    ConditionExpression="attribute_not_exists(pk)")
+            except db.exceptions.ConditionalCheckFailedException:
+                pass
+        record = _s(json.dumps(body["record"]))
+        db.transact_write_items(TransactItems=[
+            {"Put": {"TableName": table, "Item": {
+                **_record_key(owner, day.isoformat()), "record": record}}},
+            {"Update": {**args, "UpdateExpression": "SET recordDate = :day, #record = :record",
+                        "ConditionExpression": "attribute_not_exists(recordDate) OR recordDate <= :day",
+                        "ExpressionAttributeNames": {"#record": "record"},
+                        "ExpressionAttributeValues": {":day": _s(day.isoformat()), ":record": record}}},
+        ])
+        item = db.get_item(**args, ConsistentRead=True).get("Item", {})
+        return _report(db, args, item, day)
     else:
         claims = event["requestContext"]["authorizer"]["jwt"]["claims"]
         username = claims.get("username") or claims.get("cognito:username")
