@@ -180,3 +180,7 @@ export function getDailyReport() {
 export function saveDailyReport(body) {
   return request("/daily-report", null, { method: "POST", fallbackOnly: true, body });
 }
+export function hideGuide(eventId) {
+  return request("/demo/anomaly", null, { method: "POST", fallbackOnly: true,
+    body: { action: "hide_guide", eventId } });
+}

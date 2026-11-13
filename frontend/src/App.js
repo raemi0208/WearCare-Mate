@@ -13,7 +13,7 @@ import SettingsPage from "./pages/SettingsPage";
 
 import DemoAnomalyPanel from "./components/DemoAnomalyPanel";
 
-import { fetchDashboard, fetchAiGuide, fetchDemoAnomaly, sendDemoEmail, fetchHistory, hideNotification } from "./services/api";
+import { fetchDashboard, fetchAiGuide, fetchDemoAnomaly, sendDemoEmail, fetchHistory, hideNotification, hideGuide } from "./services/api";
 import { isAuthEnabled } from "./services/authConfig";
 import { login, logout } from "./services/cognitoAuth";
 
@@ -133,6 +133,12 @@ function App() {
     setData((prev) => prev ? { ...prev, notifications: (prev.notifications || []).filter((item) => item.id !== id) } : prev);
   }, []);
 
+  const handleHideGuide = useCallback(async (id) => {
+    try { await hideGuide(id); }
+    catch (err) { if (err.authRequired) setAuthError(true); throw err; }
+    setData((prev) => prev ? { ...prev, guideHistory: (prev.guideHistory || []).filter((item) => item.id !== id) } : prev);
+  }, []);
+
   const handleProfileSaved = useCallback((updatedUser) => {
     setData((prev) => (prev ? { ...prev, user: updatedUser } : prev));
   }, []);
@@ -227,6 +233,7 @@ function App() {
       case "guide":
         return (
           <GuidePage
+            onHideGuide={isAuthEnabled() ? handleHideGuide : undefined}
             {...common}
             onRegenerate={regenerateHandler}
             regenerating={regenerating}
