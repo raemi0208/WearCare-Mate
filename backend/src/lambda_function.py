@@ -289,6 +289,12 @@ def _route_request(event):
         from src.history_service import read_history
         return _build_response(200, read_history(event))
 
+    if path == "/daily-report" and method in ("GET", "POST"):
+        from src.report_service import handle_report
+        response = _build_response(200, handle_report(event, method))
+        response["headers"]["Cache-Control"] = "no-store"
+        return response
+
     # 3) GET /users/{userId}/health-data
     #    DATA_SOURCE 설정으로 빌더를 고른다. 기본값(mock)이면 기존 MOCK 빌더를 쓴다.
     #    ⚠️ real 은 ENABLE_REAL_DATA_TESTING=true 일 때만 Athena 를 조회한다(개발·통합 테스트 전용).
@@ -353,6 +359,14 @@ def lambda_handler(event, context):
         dict: API Gateway 형식의 응답 객체.
     """
     try:
+        if (isinstance(event, dict) and event.get("source") == "aws.events"
+                and event.get("detail-type") == "Scheduled Event"
+                and "requestContext" not in event):
+            from datetime import datetime
+            from src.report_service import send_due_reports
+            result = send_due_reports(datetime.fromisoformat(event["time"]))
+            logger.info("Daily report delivery counts: %s", result)
+            return result
         return _route_request(event)
     except HistoryError as error:
         return _build_response(error.status, {"error": error.code})
