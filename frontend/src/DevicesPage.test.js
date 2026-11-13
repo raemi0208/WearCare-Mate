@@ -13,7 +13,7 @@ beforeEach(() => localStorage.clear());
 
 test("기기 연동 화면에는 건강 앱 연동만 표시한다", () => {
   render(<DevicesPage data={realData} />);
-  expect(screen.getByText("건강 앱 연동")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "기기 연동 미리보기" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "건강 앱 연동하기" })).toBeInTheDocument();
 });
 

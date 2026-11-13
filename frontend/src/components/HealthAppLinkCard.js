@@ -124,8 +124,8 @@ export default function HealthAppLinkCard({ timeseries }) {
   return (
     <>
       <Card
-        title="건강 앱 연동"
-        subtitle="아이폰은 애플 건강, 삼성은 삼성 헬스, 그 외 기기는 기타 웨어러블 앱과 연동합니다"
+        title="기기 연동 미리보기"
+        subtitle="애플 건강과 삼성 헬스 연결 과정을 체험할 수 있어요. 실제 건강 데이터는 불러오지 않습니다."
         action={
           links.length > 0 ? <Badge variant="normal">{links.length}개 연동됨</Badge> : <Badge variant="ghost">미연동</Badge>
         }

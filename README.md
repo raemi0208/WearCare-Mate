@@ -1,6 +1,6 @@
 > **현재 HTTPS 발표 구현 (2026-11-10)**
 >
-> https://wearcare-mate-dxqh.vercel.app/ · 배포 브랜치 `frontend-b-cognito-auth`.
+> [Vercel 발표 사이트](https://wearcare-mate-dxqh.vercel.app/) · 배포 브랜치 `frontend-b-cognito-auth`.
 > Cognito 로그인 → API Gateway/Lambda → S3/Glue/Athena 실제 데이터 조회,
 > AI/ML Lambda 판정 + Bedrock 가이드 생성, Vercel 웹 배포를 사용합니다.
 > 알림·가이드 이력은 계정별 DynamoDB 보관이며, SNS 메일 발송 버튼은 기존 구독자에게 실제 이메일을 보냅니다.
@@ -113,7 +113,7 @@ REACT_APP_API_BASE=https://your-api-gateway-url
 1. **데이터 수집 및 저장** — 웨어러블 데이터셋 Amazon S3 적재, AWS Lambda 전처리
 2. **시계열 저장 및 이상 탐지** — Amazon Timestream 저장, Amazon SageMaker 평소 패턴 학습/이상 탐지
 3. **AI 가이드 생성** — Amazon Bedrock이 맞춤형 행동 가이드 생성
-4. **알림 및 웹 서빙** — Amazon SNS 푸시 알림, AWS Amplify 웹 대시보드(본 저장소)를 통한 결과 확인
+4. **알림 및 웹 서빙** — Amazon SNS 푸시 알림, Vercel에 배포된 웹 대시보드(본 저장소)를 통한 결과 확인
 
 ## 문서
 
