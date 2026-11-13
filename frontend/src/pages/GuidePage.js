@@ -4,16 +4,18 @@ import Badge from "../components/ui/Badge";
 import AiGuide from "../components/AiGuide";
 import DemoBanner from "../components/DemoBanner";
 
-export default function GuidePage({ data, onRegenerate, regenerating, demoActive = false, demoReferenceDate = null, onLoadMore, historyLoading = false, onHideGuide }) {
+export default function GuidePage({ data, onRegenerate, regenerating, demoActive = false, demoReferenceDate = null, onLoadMore, historyLoading = false, onHideGuide, onClearHistory }) {
   const history = data.guideHistory || [];
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
 
   async function removeGuide(id) {
-    setBusy(id);
+    if (id === null && !window.confirm("가이드 히스토리를 모두 삭제할까요?")) return;
+    setBusy(id ?? "all");
     setError("");
     try {
-      await onHideGuide(id);
+      if (id === null) await onClearHistory("guideHistory");
+      else await onHideGuide(id);
     } catch {
       setError("가이드를 삭제하지 못했습니다. 다시 시도해 주세요.");
     } finally {
@@ -34,6 +36,10 @@ export default function GuidePage({ data, onRegenerate, regenerating, demoActive
 
         <Card
           icon="📋" title="가이드 히스토리"
+          action={onClearHistory && (history.length > 0 || data.nextCursor) && (
+            <button type="button" className="btn" disabled={busy !== null || historyLoading}
+              onClick={() => removeGuide(null)}>{busy === "all" ? "삭제 중…" : "전체 삭제"}</button>
+          )}
           subtitle="Amazon Bedrock이 생성한 과거 가이드"
         >
           <p className="ui-note">로그인 계정별로 저장된 가이드입니다. 가상 시연 결과에는 별도 표시가 붙습니다.</p>
@@ -57,7 +63,7 @@ export default function GuidePage({ data, onRegenerate, regenerating, demoActive
               </div>
             ))}
           </div>
-          {data.nextCursor && onLoadMore && <button className="btn" disabled={historyLoading} onClick={() => onLoadMore(data.nextCursor)}>{historyLoading ? "불러오는 중…" : "이전 내역 더 보기"}</button>}
+          {data.nextCursor && onLoadMore && <button className="btn" disabled={historyLoading || busy !== null} onClick={() => onLoadMore(data.nextCursor)}>{historyLoading ? "불러오는 중…" : "이전 내역 더 보기"}</button>}
         </Card>
       </div>
     </div>

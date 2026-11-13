@@ -13,7 +13,7 @@ import SettingsPage from "./pages/SettingsPage";
 
 import DemoAnomalyPanel from "./components/DemoAnomalyPanel";
 
-import { fetchDashboard, fetchAiGuide, fetchDemoAnomaly, sendDemoEmail, fetchHistory, hideNotification, hideGuide } from "./services/api";
+import { fetchDashboard, fetchAiGuide, fetchDemoAnomaly, sendDemoEmail, fetchHistory, hideNotification, hideGuide, clearHistory } from "./services/api";
 import { isAuthEnabled } from "./services/authConfig";
 import { login, logout } from "./services/cognitoAuth";
 
@@ -139,6 +139,12 @@ function App() {
     setData((prev) => prev ? { ...prev, guideHistory: (prev.guideHistory || []).filter((item) => item.id !== id) } : prev);
   }, []);
 
+  const handleClearHistory = useCallback(async (kind) => {
+    try { await clearHistory(kind); }
+    catch (err) { if (err.authRequired) setAuthError(true); throw err; }
+    setData((prev) => prev ? { ...prev, [kind]: [] } : prev);
+  }, []);
+
   const handleProfileSaved = useCallback((updatedUser) => {
     setData((prev) => (prev ? { ...prev, user: updatedUser } : prev));
   }, []);
@@ -220,7 +226,7 @@ function App() {
       ? (demoResult.aiGuide && demoResult.aiGuide.referenceDate) || null
       : null;
     // 가상 시연 안내/날짜를 각 페이지가 일관되게 쓰도록 공통 prop 으로 전달한다.
-    const common = { data: viewData, demoActive, demoReferenceDate, onLoadMore: loadMoreHistory, historyLoading, onHideNotification: handleHideNotification };
+    const common = { data: viewData, demoActive, demoReferenceDate, onLoadMore: loadMoreHistory, historyLoading, onHideNotification: handleHideNotification, onClearHistory: isAuthEnabled() ? handleClearHistory : undefined };
     // 시연 결과를 보는 동안에는 "분석 및 가이드 다시 확인"(실제 /ai-guide 재조회)을 숨긴다.
     // 시연(가상 가이드) 표시 중에 실제 데이터 요청이 섞여 data.aiGuide 를 덮어쓰는 것을 막기 위함이다.
     // 실제 데이터로 돌아간 뒤에는 다시 재확인 버튼이 나타난다.

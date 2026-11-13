@@ -184,3 +184,7 @@ export function hideGuide(eventId) {
   return request("/demo/anomaly", null, { method: "POST", fallbackOnly: true,
     body: { action: "hide_guide", eventId } });
 }
+export function clearHistory(kind) {
+  return request("/demo/anomaly", null, { method: "POST", fallbackOnly: true,
+    body: { action: kind === "guideHistory" ? "clear_guides" : "clear_notifications" } });
+}

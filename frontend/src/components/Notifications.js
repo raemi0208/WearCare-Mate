@@ -1,18 +1,26 @@
 import React, { useState } from "react";
 import Card from "./ui/Card";
 
-export default function Notifications({ notifications = [], onHide }) {
+export default function Notifications({ notifications = [], onHide, onClear, historyLoading }) {
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const hide = async (id) => {
-    setBusy(id);
+    if (id === null && !window.confirm("SNS 알림 내역을 모두 삭제할까요?")) return;
+    setBusy(id ?? "all");
     setError(null);
-    try { await onHide(id); }
+    try {
+      if (id === null) await onClear("notifications");
+      else await onHide(id);
+    }
     catch { setError("알림을 삭제하지 못했습니다. 다시 시도해 주세요."); }
     finally { setBusy(null); }
   };
   return (
-    <Card icon="🔔" title="알림" subtitle="SNS 이메일 발송 요청 내역">
+    <Card icon="🔔" title="알림" subtitle="SNS 이메일 발송 요청 내역"
+      action={onClear && (
+        <button type="button" className="btn" disabled={busy !== null || historyLoading}
+          onClick={() => hide(null)}>{busy === "all" ? "삭제 중…" : "전체 삭제"}</button>
+      )}>
       {onHide && notifications.length > 0 && <p className="ui-note">삭제하면 목록에서 숨겨집니다. 보낸 메일과 중복 발송 방지 기록은 유지됩니다.</p>}
       {error && <p className="ui-note" role="alert">{error}</p>}
       <div className="notif-list">
