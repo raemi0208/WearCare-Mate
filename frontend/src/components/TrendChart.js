@@ -19,7 +19,7 @@ export default function TrendChart({ steps = [] }) {
           </span>
         )}
       </div>
-      <LineChart data={steps} />
+      <LineChart data={steps} showValues />
     </Card>
   );
 }

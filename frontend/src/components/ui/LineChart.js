@@ -1,7 +1,7 @@
 import React, { useId } from "react";
 
 // data: [{ label, value, anomaly?, includedRows? }]
-export default function LineChart({ data = [], height = 220 }) {
+export default function LineChart({ data = [], height = 220, showValues = false }) {
   const gradientId = `wcm-area-${useId().replace(/:/g, "")}`;
   const items = Array.isArray(data) ? data : [];
   const width = 640;
@@ -11,7 +11,7 @@ export default function LineChart({ data = [], height = 220 }) {
       : 220;
 
   const padX = 36;
-  const padY = 24;
+  const padY = showValues ? 30 : 24;
   const innerW = width - padX * 2;
   const innerH = chartHeight - padY * 2;
 
@@ -192,6 +192,18 @@ export default function LineChart({ data = [], height = 220 }) {
                     />
                   )}
                 </>
+              )}
+
+              {showValues && valid && showLabel && (
+                <text
+                  className="linechart__value-label"
+                  x={xAt(index)}
+                  y={yAt(item.value) - (item.anomaly ? 15 : 9)}
+                  textAnchor="middle"
+                  aria-hidden="true"
+                >
+                  {item.value.toLocaleString("ko-KR")}
+                </text>
               )}
 
               {showLabel && (
