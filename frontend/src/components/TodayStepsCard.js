@@ -11,8 +11,10 @@ const fields = [
   { key: "sleep", label: "수면 시간 (시간)", min: 0, max: 24, step: "any" },
 ];
 
-export default function TodayStepsCard() {
+export default function TodayStepsCard({ onPersonalTrends }) {
   const [draft, setDraft] = useState({ steps: "", goal: "10000", sleep: "" });
+  const [history, setHistory] = useState([]);
+  const [reportDate, setReportDate] = useState("");
   const [record, setRecord] = useState(null);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -32,6 +34,8 @@ export default function TodayStepsCard() {
       setEnabled(report.enabled);
       setTime(report.time);
       setRecord(report.record);
+      setHistory(report.records || []);
+      setReportDate(report.date || "");
       if (report.record) {
         const { steps, goal, sleep } = report.record;
         setDraft({ steps: String(steps), goal: String(goal), sleep: sleep == null ? "" : String(sleep) });
@@ -60,6 +64,14 @@ export default function TodayStepsCard() {
   const remaining = record ? Math.max(0, record.goal - record.steps) : 0;
   const sleep = record?.sleep == null ? "미입력" : number.format(record.sleep) + "시간";
 
+  const start = Date.parse(reportDate) - 7 * 86400000;
+  const recent = history.filter((entry) => entry.date < reportDate &&
+    Date.parse(entry.date) >= start && Number.isFinite(entry.sleep));
+  const average = recent.length >= 3
+    ? recent.reduce((sum, entry) => sum + entry.sleep, 0) / recent.length : null;
+  const difference = average === null || record?.sleep == null
+    ? null : Math.round((record.sleep - average) * 10) / 10;
+
   async function showReport(event) {
     event.preventDefault();
     const steps = Number(draft.steps);
@@ -80,6 +92,8 @@ export default function TodayStepsCard() {
       try {
         const saved = await saveDailyReport({ record: next });
         setRecord(saved.record);
+        setHistory(saved.records || []);
+        setReportDate(saved.date || "");
       } catch {
         setError("오늘 기록을 저장하지 못했습니다. 다시 시도해 주세요.");
         return;
@@ -114,12 +128,22 @@ export default function TodayStepsCard() {
           </div>
           <div><dt>수면 시간</dt><dd>{record ? sleep : "—"}</dd></div>
         </dl>
+        {authenticated && record?.sleep != null && (
+          <p className="ui-note">{difference === null
+            ? "수면 기록이 더 쌓이면 평소와 비교할 수 있어요."
+            : `최근 7일 평균 ${number.format(average)}시간 (${recent.length}일 기록) · ${difference === 0
+                ? "오늘 수면은 최근 평균과 같아요."
+                : `오늘은 ${number.format(Math.abs(difference))}시간 ${difference < 0 ? "적어요." : "많아요."}`}`}</p>
+        )}
         {!record && !editing && <p className="ui-note">오늘 기록을 입력해 주세요.</p>}
         <div className="today-report__actions">
           <button type="button" className="btn btn--primary" aria-expanded={editing}
             onClick={() => { setEditing(!editing); setError(""); }}>
             {editing ? "입력 닫기" : record ? "오늘 기록 수정" : "오늘 기록 입력"}
           </button>
+          {authenticated && onPersonalTrends && (
+            <button type="button" className="btn" onClick={onPersonalTrends}>내 기록 추이 보기</button>
+          )}
           <button type="button" className="btn" aria-expanded={preview} onClick={() => setPreview(!preview)}>
             {preview ? "이메일 설정 닫기" : "이메일 리포트 설정"}
           </button>

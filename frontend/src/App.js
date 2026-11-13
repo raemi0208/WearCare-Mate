@@ -49,6 +49,7 @@ function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [personalTrends, setPersonalTrends] = useState(false);
   const [activeNav, setActiveNav] = useState("dashboard");
   const [regenerating, setRegenerating] = useState(false);
   const [guideError, setGuideError] = useState(null);
@@ -233,7 +234,7 @@ function App() {
     const regenerateHandler = demoActive ? undefined : handleRegenerate;
     switch (activeNav) {
       case "trends":
-        return <TrendsPage {...common} />;
+        return <TrendsPage {...common} initialPersonal={personalTrends} />;
       case "anomaly":
         return <AnomalyPage {...common} />;
       case "guide":
@@ -257,7 +258,7 @@ function App() {
       case "dashboard":
       default:
         return (
-          <DashboardPage
+          <DashboardPage onPersonalTrends={() => { setPersonalTrends(true); setActiveNav("trends"); }}
             {...common}
             onRegenerate={regenerateHandler}
             regenerating={regenerating}
@@ -268,7 +269,7 @@ function App() {
 
   return (
     <div className="app">
-      <Sidebar active={activeNav} onSelect={setActiveNav} />
+      <Sidebar active={activeNav} onSelect={(page) => { setPersonalTrends(false); setActiveNav(page); }} />
 
       <div className="main">
         <Topbar

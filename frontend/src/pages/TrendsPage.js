@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import LineChart from "../components/ui/LineChart";
+import { isAuthEnabled } from "../services/authConfig";
+import { getDailyReport } from "../services/api";
 import DatasetTrends from "../components/DatasetTrends";
 
 const SERIES = [
@@ -18,7 +20,24 @@ function isValidPoint(point) {
   );
 }
 
-export default function TrendsPage({ data }) {
+export default function TrendsPage({ data, initialPersonal = false }) {
+  const authenticated = isAuthEnabled();
+  const [personal, setPersonal] = useState(initialPersonal);
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!personal || !authenticated) return undefined;
+    let active = true;
+    getDailyReport().then((value) => {
+      if (active) { setReport(value); setError(false); }
+    }).catch(() => { if (active) setError(true); });
+    return () => { active = false; };
+  }, [personal, authenticated]);
+
+  const points = report?.records?.filter((entry) => Number.isFinite(entry.sleep))
+    .map((entry) => ({ label: entry.date.slice(5), value: entry.sleep })) || [];
+
   const timeseries = data.timeseries || {};
 
   const hasDatasetSummaries =
@@ -33,6 +52,22 @@ export default function TrendsPage({ data }) {
 
   return (
     <div className="grid">
+      {authenticated && (
+        <div className="chart__tabs" aria-label="기록 출처">
+          <button type="button" className={`chart__tab ${personal ? "" : "is-active"}`}
+            aria-pressed={!personal} onClick={() => setPersonal(false)}>공개 데이터</button>
+          <button type="button" className={`chart__tab ${personal ? "is-active" : ""}`}
+            aria-pressed={personal} onClick={() => setPersonal(true)}>내 기록</button>
+        </div>
+      )}
+      {personal && authenticated ? (
+        <Card icon="🌙" title="내 수면 기록" subtitle="최근 30일 · 직접 입력 · 단위 시간">
+          {error ? <p role="alert">내 기록을 불러오지 못했습니다.</p>
+            : !report ? <p role="status">내 기록을 불러오는 중이에요.</p>
+            : points.length ? <LineChart data={points} />
+            : <p>오늘의 건강 리포트에서 수면 시간을 입력해 주세요.</p>}
+        </Card>
+      ) : <>
       {visibleSeries.map((seriesConfig) => {
         const rawSeries = timeseries[seriesConfig.key];
         const series = Array.isArray(rawSeries) ? rawSeries : [];
@@ -113,6 +148,7 @@ export default function TrendsPage({ data }) {
           heartSummary={data.heartRateDatasetSummary}
         />
       )}
+      </>}
     </div>
   );
 }
