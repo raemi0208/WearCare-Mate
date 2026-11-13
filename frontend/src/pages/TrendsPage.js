@@ -36,7 +36,7 @@ export default function TrendsPage({ data, initialPersonal = false }) {
   }, [personal, authenticated]);
 
   const points = report?.records?.filter((entry) => Number.isFinite(entry.sleep))
-    .map((entry) => ({ label: entry.date.slice(5), value: entry.sleep })) || [];
+    .map((entry) => ({ label: entry.date, value: entry.sleep })) || [];
 
   const timeseries = data.timeseries || {};
 
@@ -64,7 +64,7 @@ export default function TrendsPage({ data, initialPersonal = false }) {
         <Card icon="🌙" title="내 수면 기록" subtitle="최근 30일 · 직접 입력 · 단위 시간">
           {error ? <p role="alert">내 기록을 불러오지 못했습니다.</p>
             : !report ? <p role="status">내 기록을 불러오는 중이에요.</p>
-            : points.length ? <LineChart data={points} />
+            : points.length ? <LineChart data={points} showValues valueSuffix="시간" />
             : <p>오늘의 건강 리포트에서 수면 시간을 입력해 주세요.</p>}
         </Card>
       ) : <>

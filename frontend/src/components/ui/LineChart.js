@@ -1,7 +1,7 @@
 import React, { useId } from "react";
 
 // data: [{ label, value, anomaly?, includedRows? }]
-export default function LineChart({ data = [], height = 220, showValues = false }) {
+export default function LineChart({ data = [], height = 220, showValues = false, valueSuffix = "" }) {
   const gradientId = `wcm-area-${useId().replace(/:/g, "")}`;
   const items = Array.isArray(data) ? data : [];
   const width = 640;
@@ -202,7 +202,7 @@ export default function LineChart({ data = [], height = 220, showValues = false 
                   textAnchor="middle"
                   aria-hidden="true"
                 >
-                  {item.value.toLocaleString("ko-KR")}
+                  {item.value.toLocaleString("ko-KR")}{valueSuffix}
                 </text>
               )}
 
