@@ -99,6 +99,18 @@ class HistoryStore:
             ConditionExpression="attribute_exists(pk)",
             ExpressionAttributeValues={":hidden": {"BOOL": True}})
 
+    def clear_history(self, kind):
+        stamp = datetime.now(timezone.utc).isoformat()
+        self.client.update_item(
+            TableName=self.table, Key=self._clear_key(),
+            UpdateExpression="SET #kind = :stamp",
+            ConditionExpression="attribute_not_exists(#kind) OR #kind < :stamp",
+            ExpressionAttributeNames={"#kind": kind},
+            ExpressionAttributeValues={":stamp": {"S": stamp}})
+
+    def _clear_key(self):
+        return {"pk": {"S": self.pk}, "sk": {"S": "HISTORY_CLEAR"}}
+
     def page(self, cursor=None):
         args = dict(TableName=self.table, KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
             ExpressionAttributeValues={":pk": {"S": self.pk}, ":prefix": {"S": "EVENT#"}},
@@ -110,6 +122,10 @@ class HistoryStore:
             except (ValueError, UnicodeError):
                 raise HistoryError(400, "invalid_cursor") from None
         response = self.client.query(**args)
+        cleared = self.client.get_item(TableName=self.table, Key=self._clear_key(),
+                                       ConsistentRead=True).get("Item", {})
+        guide_cutoff = cleared.get("guide", {}).get("S", "")
+        notification_cutoff = cleared.get("notification", {}).get("S", "")
         last = response.get("LastEvaluatedKey")
         next_cursor = base64.urlsafe_b64encode(last["sk"]["S"][6:].encode()).decode() if last else None
         guides, notifications = [], []
@@ -117,14 +133,17 @@ class HistoryStore:
             item = json.loads(row["payload"]["S"])
             result = item.get("result", {})
             guide = result.get("aiGuide", {})
-            if guide.get("status") == "generated" and not row.get("guideHidden", {}).get("BOOL"):
+            if (guide.get("status") == "generated" and item["createdAt"] > guide_cutoff
+                    and not row.get("guideHidden", {}).get("BOOL")):
                 guides.append(dict(id=item["id"], date=item["createdAt"],
                     referenceDate=result.get("referenceDate"), headline=guide.get("headline"),
                     text=guide.get("text"), lines=guide.get("lines", []),
                     tag=("가상 시연 · " if result.get("inputKind") == "virtual" else "실제 기록 · ") + result.get("scenarioLabel", "걸음 수"),
                     inputKind=result.get("inputKind", "real")))
-            if item.get("notification") and not row.get("notificationHidden", {}).get("BOOL"):
-                notifications.append(item["notification"])
+            notice = item.get("notification")
+            if notice and not row.get("notificationHidden", {}).get("BOOL"):
+                if not notification_cutoff or notice.get("time", "") > notification_cutoff:
+                    notifications.append(notice)
         return dict(guideHistory=guides, notifications=notifications, nextCursor=next_cursor, historyStatus="ok")
 
 
@@ -196,7 +215,9 @@ def handle_demo(event, store_factory=HistoryStore, runner=run_demo_anomaly, sns_
     owner = principal(event)
     body = parse_body(event)
     action = body.get("action", "analyze")
-    if not isinstance(action, str) or action not in ("analyze", "send", "hide_notification", "hide_guide"):
+    if not isinstance(action, str) or action not in (
+        "analyze", "send", "hide_notification", "hide_guide", "clear_guides", "clear_notifications"
+    ):
         raise HistoryError(400, "invalid_action")
     scenario = body.get("scenario", "steps")
     if not isinstance(scenario, str) or scenario not in SCENARIOS:
@@ -208,6 +229,9 @@ def handle_demo(event, store_factory=HistoryStore, runner=run_demo_anomaly, sns_
     if action == "hide_guide":
         store.hide_guide(body.get("eventId"))
         return dict(statusCode=200, hiddenEventId=body.get("eventId"))
+    if action in ("clear_guides", "clear_notifications"):
+        store.clear_history("guide" if action == "clear_guides" else "notification")
+        return dict(statusCode=200)
     if action == "send":
         return send_saved(store, body.get("eventId"), sns_factory)
     if "eventId" in body:
