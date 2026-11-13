@@ -10,7 +10,7 @@ export default function SleepMetrics({ summary }) {
   const note = summary?.status === "error" ? "수면 데이터셋을 조회하지 못했습니다." :
     summary?.status === "empty" ? "조회된 수면 기록이 없습니다." : "수면 관련 집계가 제공되지 않았습니다.";
   return (
-    <Card title="수면 관련 지표" subtitle="수면 시간 · 수면 중 움직임" action={<Badge variant="ghost">{summary ? "별도 데이터셋" : "정보 미제공"}</Badge>}>
+    <Card icon="🌙" title="수면 관련 지표" subtitle="수면 시간 · 수면 중 움직임" action={<Badge variant="ghost">{summary ? "별도 데이터셋" : "정보 미제공"}</Badge>}>
       {ok ? (
         <dl style={{display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 16, margin: "0 0 12px"}}>
           <div>

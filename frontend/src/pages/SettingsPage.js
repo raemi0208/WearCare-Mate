@@ -46,7 +46,7 @@ export default function SettingsPage({ user, onProfileSaved }) {
 
   return (
     <div className="grid">
-      <Card title="프로필 정보" subtitle="이 브라우저에 저장되는 표시용 프로필입니다">
+      <Card icon="👤" title="프로필 정보" subtitle="이 브라우저에 저장되는 표시용 프로필입니다">
         <p className="ui-note">이 정보는 현재 AI 분석에 사용되지 않으며, 다른 브라우저나 기기와 공유되지 않습니다.</p>
         <form className="form" onSubmit={handleSubmit}>
           <div className="form__row">
@@ -136,7 +136,7 @@ export default function SettingsPage({ user, onProfileSaved }) {
         </form>
       </Card>
 
-      <Card title="알림 설정" subtitle="시연용 알림 선호 설정">
+      <Card icon="🔔" title="알림 설정" subtitle="시연용 알림 선호 설정">
         <p className="ui-note">변경 사항 저장을 누르면 이 브라우저에만 저장됩니다. 실제 SNS 이메일 수신 설정에는 반영되지 않습니다. 분석만으로는 메일을 보내지 않으며, 대시보드의 SNS 메일 발송 버튼을 누르면 기존 구독 주소로 실제 이메일을 보냅니다.</p>
         <div className="toggle-list">
           <label className="toggle-item">

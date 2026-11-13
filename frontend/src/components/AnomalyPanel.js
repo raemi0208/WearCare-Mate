@@ -41,7 +41,7 @@ export default function AnomalyPanel({ anomalies = [], embedded = false, analysi
 
   return (
     <Card
-      title="이상 패턴 탐지"
+      icon="⚠️" title="이상 패턴 탐지"
       subtitle={displayReferenceDate ? `${displayReferenceDate} · 걸음 수 개인 기준선 분석` : "예시 분석 데이터"}
       action={
         <Badge variant={alertCount > 0 ? "danger" : "normal"}>

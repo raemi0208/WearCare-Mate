@@ -31,7 +31,7 @@ export default function TrendChart({ timeseries }) {
 
   return (
     <Card
-      title="시계열 추이"
+      icon="📈" title="시계열 추이"
       subtitle={`조회된 기준 주의 ${current.label} 기록 (단위: ${current.unit})`}
       action={tabs}
     >

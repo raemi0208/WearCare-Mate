@@ -94,7 +94,7 @@ export default function TodayStepsCard() {
   }
 
   return (
-    <Card title="오늘의 건강 리포트" subtitle="Apple 건강에서 확인 · 직접 입력">
+    <Card icon="📋" title="오늘의 건강 리포트" subtitle="Apple 건강에서 확인 · 직접 입력">
       <div className="today-report">
         <dl className="today-report__row" aria-live="polite">
           <div>

@@ -12,7 +12,7 @@ export default function Notifications({ notifications = [], onHide }) {
     finally { setBusy(null); }
   };
   return (
-    <Card title="알림" subtitle="SNS 이메일 발송 요청 내역">
+    <Card icon="🔔" title="알림" subtitle="SNS 이메일 발송 요청 내역">
       {onHide && notifications.length > 0 && <p className="ui-note">삭제하면 목록에서 숨겨집니다. 보낸 메일과 중복 발송 방지 기록은 유지됩니다.</p>}
       {error && <p className="ui-note" role="alert">{error}</p>}
       <div className="notif-list">

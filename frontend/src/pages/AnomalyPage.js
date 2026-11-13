@@ -45,7 +45,7 @@ export default function AnomalyPage({ data, demoActive = false, demoReferenceDat
       </div>
 
       <Card
-        title="이상 패턴 상세 내역"
+        icon="⚠️" title="이상 패턴 상세 내역"
         subtitle={demoActive ? "가상 시연 입력에 대한 이상 탐지 결과" : (data.analysis?.note || "예시 이상 탐지 내역")}
       >
         <AnomalyPanel

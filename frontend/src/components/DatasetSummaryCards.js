@@ -1,3 +1,4 @@
+import Card from "./ui/Card";
 import React from "react";
 
 // 발표용 "별도 데이터셋" 요약 카드 3개 (수면 · 심박 · 심리상담)
@@ -35,27 +36,23 @@ function statusNote(status) {
   return null;
 }
 
-function CardShell({ title, summary, children }) {
+function CardShell({ title, icon, summary, children }) {
   const note = summary ? statusNote(summary.status) : "집계 정보를 사용할 수 없습니다.";
   return (
-    <div className="card" style={{ padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <strong>{title}</strong>
-        <Badge label={summary && summary.sourceLabel} />
-      </div>
+    <Card title={title} icon={icon} action={<Badge label={summary && summary.sourceLabel} />}>
       {note ? (
         <p className="ui-note" style={{ margin: 0 }}>{note}</p>
       ) : (
         children
       )}
-    </div>
+    </Card>
   );
 }
 
 function SleepCard({ summary }) {
   const ok = summary && summary.status === "ok";
   return (
-    <CardShell title="수면 데이터셋" summary={summary}>
+    <CardShell icon="🌙" title="수면 데이터셋" summary={summary}>
       {ok && (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ fontSize: 22, fontWeight: 800 }}>
@@ -82,7 +79,7 @@ function HeartRateCard({ summary }) {
       ? "양수 값 평균"
       : "전체 평균";
   return (
-    <CardShell title="심박 데이터셋" summary={summary}>
+    <CardShell icon="❤️" title="심박 데이터셋" summary={summary}>
       {ok && (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ fontSize: 13 }}>
@@ -109,7 +106,7 @@ function HeartRateCard({ summary }) {
 function PsychologyCard({ summary }) {
   const ok = summary && summary.status === "ok" && summary.files && summary.files.length > 0;
   return (
-    <CardShell title="심리상담 데이터셋" summary={summary}>
+    <CardShell icon="💬" title="심리상담 데이터셋" summary={summary}>
       {ok && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {summary.files.map((f) => (

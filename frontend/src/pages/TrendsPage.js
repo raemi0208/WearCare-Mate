@@ -52,7 +52,7 @@ export default function TrendsPage({ data }) {
         return (
           <Card
             key={seriesConfig.key}
-            title={`${seriesConfig.icon} ${seriesConfig.title}`}
+            icon={seriesConfig.icon} title={seriesConfig.title}
             subtitle={`조회된 기준 주의 기록 (단위: ${seriesConfig.unit})`}
             action={
               anomalyCount > 0 ? (

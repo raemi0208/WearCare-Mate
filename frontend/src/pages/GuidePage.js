@@ -19,7 +19,7 @@ export default function GuidePage({ data, onRegenerate, regenerating, demoActive
         />
 
         <Card
-          title="가이드 히스토리"
+          icon="📋" title="가이드 히스토리"
           subtitle="Amazon Bedrock이 생성한 과거 가이드"
         >
           <p className="ui-note">로그인 계정별로 저장된 가이드입니다. 가상 시연 결과에는 별도 표시가 붙습니다.</p>

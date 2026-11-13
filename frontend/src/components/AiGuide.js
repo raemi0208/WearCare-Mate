@@ -28,7 +28,8 @@ export default function AiGuide({ guide, onRegenerate, regenerating = false }) {
   return (
     <section className="card ai-guide">
       <header className="card__header">
-        <div>
+        <div className="card__heading">
+          <span className="card__icon" aria-hidden="true">💬</span>
           <h3 className="card__title">AI 맞춤 건강 가이드</h3>
         </div>
         <span className="ai-guide__badge">{badge}</span>

@@ -18,15 +18,16 @@ export default function DashboardPage({ data, onRegenerate, regenerating, demoAc
     <>
       <DemoBanner demoActive={demoActive} demoReferenceDate={demoReferenceDate} />
       <TodayStepsCard />
+      <Notifications notifications={data.notifications} onHide={onHideNotification} />
       {data.analysis && (
         <div className="card" style={{ padding: 16 }}>
           <p>분석 기준일: {displayReferenceDate}</p>
           <p className="ui-note">{demoActive ? "가상 시연 입력에 대한 이상 탐지 결과입니다." : data.analysis.note}</p>
         </div>
       )}
-      <div className="grid grid--stats">
+      <div className="grid grid--stats dashboard-stats">
         {data.summaryStats.map((s) => (
-          <StatCard key={s.id} {...s} />
+          <StatCard key={s.id} {...s} wide={s.id === "steps"} />
         ))}
       </div>
 
@@ -44,7 +45,7 @@ export default function DashboardPage({ data, onRegenerate, regenerating, demoAc
         onRegenerate={onRegenerate}
         regenerating={regenerating}
       />
-      <Notifications notifications={data.notifications} onHide={onHideNotification} />
+
     </>
   );
 }
