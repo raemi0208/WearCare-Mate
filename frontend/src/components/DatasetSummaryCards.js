@@ -138,7 +138,7 @@ export default function DatasetSummaryCards({ data }) {
   if (!sleep && !heart && !psychology) return null;
 
   return (
-    <div className="grid grid--stats" aria-label="별도 데이터셋 요약">
+    <div className="grid grid--datasets" aria-label="별도 데이터셋 요약">
       <SleepCard summary={sleep} />
       <HeartRateCard summary={heart} />
       <PsychologyCard summary={psychology} />

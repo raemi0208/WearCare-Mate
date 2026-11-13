@@ -32,26 +32,19 @@ export default function DashboardPage({ data, onRegenerate, regenerating, demoAc
 
       <DatasetSummaryCards data={data} />
 
-      <div className="grid grid--main">
-        <div className="grid">
-          <TrendChart timeseries={data.timeseries} />
-          <SleepStages sleepStages={data.sleepStages} sleepSummary={data.sleepDatasetSummary} />
-          <AnomalyPanel
-            anomalies={data.anomalies}
-            analysis={data.analysis}
-            referenceDateOverride={demoActive ? demoReferenceDate : null}
-          />
-        </div>
-
-        <div className="grid">
-          <AiGuide
-            guide={data.aiGuide}
-            onRegenerate={onRegenerate}
-            regenerating={regenerating}
-          />
-          <Notifications notifications={data.notifications} onHide={onHideNotification} />
-        </div>
-      </div>
+      <TrendChart timeseries={data.timeseries} />
+      <SleepStages sleepStages={data.sleepStages} sleepSummary={data.sleepDatasetSummary} />
+      <AnomalyPanel
+        anomalies={data.anomalies}
+        analysis={data.analysis}
+        referenceDateOverride={demoActive ? demoReferenceDate : null}
+      />
+      <AiGuide
+        guide={data.aiGuide}
+        onRegenerate={onRegenerate}
+        regenerating={regenerating}
+      />
+      <Notifications notifications={data.notifications} onHide={onHideNotification} />
     </>
   );
 }

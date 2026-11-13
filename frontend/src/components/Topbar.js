@@ -1,7 +1,7 @@
 import React from "react";
 import Badge from "./ui/Badge";
 
-export default function Topbar({ user, title, subtitle, onProfileClick }) {
+export default function Topbar({ user, title, subtitle, onProfileClick, onLogout }) {
   return (
     <header className="topbar">
       <div className="topbar__titles">
@@ -28,6 +28,7 @@ export default function Topbar({ user, title, subtitle, onProfileClick }) {
             </span>
           </button>
         )}
+        {onLogout && <button type="button" className="btn" onClick={onLogout}>로그아웃</button>}
       </div>
     </header>
   );

@@ -263,16 +263,10 @@ function App() {
           title={meta.title}
           subtitle={meta.subtitle}
           onProfileClick={() => setActiveNav("settings")}
+          onLogout={isAuthEnabled() ? () => logout() : undefined}
         />
 
         <div className="content">
-          {isAuthEnabled() && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-              <button className="btn" onClick={() => logout()}>
-                로그아웃
-              </button>
-            </div>
-          )}
           {data?.historyStatus === "unavailable" && <p className="ui-note" role="status">저장된 내역을 불러오지 못했습니다. 빈 내역으로 확정된 상태는 아닙니다.</p>}
           {persistenceWarning && activeNav !== "dashboard" && <p className="ui-note" role="status">{persistenceWarning}</p>}
           {guideError && <p role="alert">{guideError}</p>}

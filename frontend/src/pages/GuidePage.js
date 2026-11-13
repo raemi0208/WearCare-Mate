@@ -9,10 +9,9 @@ export default function GuidePage({ data, onRegenerate, regenerating, demoActive
 
   return (
     // 배너는 2열 그리드 밖에서 페이지 전체 너비로 표시한다(그리드 열에 끼어들지 않게).
-    // 아래 grid--main 은 기존대로 좌 AI 가이드 · 우 히스토리 2열(작은 화면에서는 1열로 접힘).
     <div className="grid">
       <DemoBanner demoActive={demoActive} demoReferenceDate={demoReferenceDate} />
-      <div className="grid grid--main">
+      <div className="grid">
         <AiGuide
           guide={data.aiGuide}
           onRegenerate={onRegenerate}

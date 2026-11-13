@@ -45,7 +45,7 @@ export default function SettingsPage({ user, onProfileSaved }) {
   };
 
   return (
-    <div className="grid grid--main">
+    <div className="grid">
       <Card title="프로필 정보" subtitle="이 브라우저에 저장되는 표시용 프로필입니다">
         <p className="ui-note">이 정보는 현재 AI 분석에 사용되지 않으며, 다른 브라우저나 기기와 공유되지 않습니다.</p>
         <form className="form" onSubmit={handleSubmit}>
