@@ -4,6 +4,7 @@ import App from "./App";
 import { fetchDashboard, fetchAiGuide, fetchDemoAnomaly, sendDemoEmail, fetchHistory } from "./services/api";
 
 jest.mock("./services/api", () => ({
+  getDailyReport: async () => ({ enabled: false, time: "21:00", record: null }),
   fetchDashboard: jest.fn(),
   fetchAiGuide: jest.fn(),
   fetchDemoAnomaly: jest.fn(),

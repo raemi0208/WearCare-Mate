@@ -172,3 +172,11 @@ export function hideNotification(eventId) {
   return request("/demo/anomaly", null, { method: "POST", fallbackOnly: true,
     body: { action: "hide_notification", eventId } });
 }
+
+export function getDailyReport() {
+  return request("/daily-report", null, { fallbackOnly: true });
+}
+
+export function saveDailyReport(body) {
+  return request("/daily-report", null, { method: "POST", fallbackOnly: true, body });
+}
