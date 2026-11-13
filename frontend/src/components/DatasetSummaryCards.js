@@ -16,7 +16,7 @@ function statusNote(status) {
 function CardShell({ title, icon, summary, children }) {
   const note = summary ? statusNote(summary.status) : "집계 정보를 사용할 수 없습니다.";
   return (
-    <Card title={title} icon={icon} action={<Badge variant="ghost">공개 데이터셋</Badge>}>
+    <Card className="dataset-card" title={title} icon={icon} action={<Badge variant="ghost">공개 데이터셋</Badge>}>
       {note ? (
         <p className="ui-note" style={{ margin: 0 }}>{note}</p>
       ) : (
@@ -31,16 +31,12 @@ function SleepCard({ summary }) {
   return (
     <CardShell icon="🌙" title="수면 데이터셋" summary={summary}>
       {ok && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>
-            {summary.averageHours != null ? `${summary.averageHours}시간` : "—"}
-            <span style={{ fontSize: 12, fontWeight: 500, color: "var(--color-muted)", marginLeft: 6 }}>
-              평균 수면 시간
-            </span>
+        <div className="dataset-summary">
+          <div className="dataset-summary__metric">
+            <span className="ui-note">평균 수면 시간</span>
+            <strong>{summary.averageHours != null ? `${summary.averageHours}시간` : "—"}</strong>
           </div>
-          <div style={{ fontSize: 13, color: "var(--color-muted)" }}>
-            집계 기록 수 {number(summary.recordCount) ?? "—"}건
-          </div>
+          <p className="ui-note">집계 기록 수 {number(summary.recordCount) ?? "—"}건</p>
         </div>
       )}
     </CardShell>
@@ -79,12 +75,14 @@ function PsychologyCard({ summary }) {
     <CardShell icon="💬" title="심리상담 데이터셋" summary={summary}>
       {summary?.status === "ok" && (
         <div className="dataset-summary">
-          {summary.files?.map((file) => (
-            <div key={file.id} className="dataset-summary__metric">
-              <span className="ui-note">{psychologyLabels[file.id] ?? file.label}</span>
-              <strong>{file.rowCount == null ? "—" : number(file.rowCount) + "건"}</strong>
-            </div>
-          ))}
+          <div className="dataset-summary__metrics">
+            {summary.files?.map((file) => (
+              <div key={file.id} className="dataset-summary__metric">
+                <span className="ui-note">{psychologyLabels[file.id] ?? file.label}</span>
+                <strong>{file.rowCount == null ? "—" : number(file.rowCount) + "건"}</strong>
+              </div>
+            ))}
+          </div>
           <p className="ui-note">공개 자료의 항목 수를 보여줘요.</p>
         </div>
       )}
