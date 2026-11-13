@@ -1,0 +1,41 @@
+import React from "react";
+import Card from "./ui/Card";
+import Badge from "./ui/Badge";
+import SleepMetrics from "./SleepMetrics";
+
+export default function SleepStages({ sleepStages = {totalLabel: "", segments: []}, sleepSummary }) {
+  if (sleepSummary !== undefined) return <SleepMetrics summary={sleepSummary} />;
+  const { totalLabel, segments } = sleepStages;
+
+  if (segments.length === 0) return <SleepMetrics />;
+
+  return (
+    <Card
+      title="수면 단계 분석"
+      subtitle={segments.length ? "수면 구조" : "수면 단계 데이터가 연결되지 않았습니다"}
+      action={<Badge variant="ghost">총 {totalLabel}</Badge>}
+    >
+      <div className="sleep-stages">
+        {segments.map((s) => (
+          <div
+            key={s.id}
+            className="sleep-stages__seg"
+            style={{ width: `${s.pct}%`, background: s.color }}
+            title={`${s.label} ${s.pct}%`}
+          />
+        ))}
+      </div>
+      <div className="sleep-legend">
+        {segments.map((s) => (
+          <div key={s.id} className="sleep-legend__item">
+            <span
+              className="sleep-legend__swatch"
+              style={{ background: s.color }}
+            />
+            {s.label} · {s.pct}%
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}

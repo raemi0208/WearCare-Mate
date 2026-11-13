@@ -1,0 +1,336 @@
+// WearCare Mate - Cognito Authorization Code + PKCE 클라이언트 (B안)
+//
+// 외부 라이브러리 없이 브라우저 표준 API(crypto.subtle, fetch)로 PKCE 흐름을 구현합니다.
+// - 공개 앱 클라이언트(시크릿 없음)에 맞춰 token 교환 시 code_verifier 를 사용합니다.
+// - 액세스 토큰은 메모리에 보관하고, 만료 시 refresh_token 으로 조용히 갱신합니다.
+//   (refresh_token 은 sessionStorage 에만 저장: 탭을 닫으면 사라지는 시연용 수명.)
+// - AWS 자격 증명/시크릿/비밀번호는 다루지 않습니다. 토큰 값은 로그로 남기지 않습니다.
+
+import { authConfig } from "./authConfig";
+
+const PKCE_VERIFIER_KEY = "wearcare.pkce.verifier";
+const PKCE_STATE_KEY = "wearcare.pkce.state";
+const REFRESH_KEY = "wearcare.auth.refresh";
+// 진단용: 로그인을 "시작한" origin 과 호출 횟수. 민감정보(state/verifier/code/token)는 저장하지 않는다.
+const START_ORIGIN_KEY = "wearcare.pkce.startOrigin";
+const LOGIN_COUNT_KEY = "wearcare.diag.loginCount";
+const CALLBACK_COUNT_KEY = "wearcare.diag.callbackCount";
+
+// 메모리 토큰 캐시 (새로고침되면 사라지고 refresh_token 으로 재획득)
+let accessToken = null;
+let accessTokenExpiry = 0; // epoch ms
+
+// 마지막 콜백 처리의 진단 요약(민감정보 없는 boolean/origin 만). 오류 화면 표시용.
+let lastAuthDiagnostics = null;
+
+// 안전하게 sessionStorage 숫자 카운터 증가
+function bumpCount(key) {
+  try {
+    const next = (parseInt(sessionStorage.getItem(key) || "0", 10) || 0) + 1;
+    sessionStorage.setItem(key, String(next));
+    return next;
+  } catch (e) {
+    return null;
+  }
+}
+
+function readCount(key) {
+  try {
+    return parseInt(sessionStorage.getItem(key) || "0", 10) || 0;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 민감정보가 없는 진단 요약을 반환한다. (존재 여부/일치 여부/origin/호출 횟수)
+export function getLastAuthDiagnostics() {
+  return lastAuthDiagnostics;
+}
+
+// ---------- 저수준 유틸 ----------
+
+function base64UrlEncode(bytes) {
+  let str = "";
+  const arr = new Uint8Array(bytes);
+  for (let i = 0; i < arr.length; i += 1) str += String.fromCharCode(arr[i]);
+  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function randomString(byteLength = 32) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return base64UrlEncode(bytes);
+}
+
+async function sha256(input) {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return base64UrlEncode(digest);
+}
+
+function tokenEndpoint() {
+  return `${authConfig.domain}/oauth2/token`;
+}
+
+function authorizeEndpoint() {
+  return `${authConfig.domain}/oauth2/authorize`;
+}
+
+function logoutEndpoint() {
+  return `${authConfig.domain}/logout`;
+}
+
+// ---------- 로그인 시작 (authorize 로 리다이렉트) ----------
+
+// 로그인 시작 직전 진단(민감정보 없음): 저장 성공 여부·origin·redirect_uri.
+let lastLoginStartDiagnostics = null;
+
+// 준비된(한 번 생성된) authorize URL. 진단 모드에서 "계속" 버튼이 이 동일 요청으로 이동한다.
+// state/verifier 를 다시 만들지 않도록 여기에 보관한다. (URL 원문은 외부로 노출하지 않음)
+let preparedAuthorizeUrl = null;
+
+export function getLastLoginStartDiagnostics() {
+  return lastLoginStartDiagnostics;
+}
+
+// PKCE 값을 생성·저장하고 즉시 되읽어 저장 성공을 확인한다.
+// authorize URL 을 만들어 보관하되 이동은 하지 않는다. 진단 요약(민감정보 없음)을 반환.
+export async function prepareLogin() {
+  const verifier = randomString(32);
+  const challenge = await sha256(verifier);
+  const state = randomString(16);
+
+  let writeVerified = false;
+  try {
+    sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+    sessionStorage.setItem(PKCE_STATE_KEY, state);
+    sessionStorage.setItem(START_ORIGIN_KEY, window.location.origin);
+    // 저장 직후 "즉시 되읽기"로 저장 성공을 확인한다(값 원문은 비교 결과 boolean 만 남긴다).
+    writeVerified =
+      sessionStorage.getItem(PKCE_STATE_KEY) === state &&
+      sessionStorage.getItem(PKCE_VERIFIER_KEY) === verifier;
+  } catch (e) {
+    writeVerified = false;
+  }
+  const loginCount = bumpCount(LOGIN_COUNT_KEY);
+
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: authConfig.clientId,
+    redirect_uri: authConfig.redirectUri,
+    scope: authConfig.scope,
+    state,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    lang: "ko",
+  });
+  // 저장 검증 성공일 때만 authorize URL 을 보관(실패면 이동 불가하게 null 유지).
+  preparedAuthorizeUrl = writeVerified
+    ? `${authorizeEndpoint()}?${params.toString()}`
+    : null;
+
+  const redirectOrigin = (() => {
+    try {
+      return new URL(authConfig.redirectUri).origin;
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  // 민감정보 없는 진단. redirectUri 는 authorize/token 에 보내는 설정값이라 공개 가능.
+  // state/verifier/challenge/authorize URL 원문은 담지 않는다.
+  lastLoginStartDiagnostics = {
+    startOrigin: window.location.origin,
+    redirectUri: authConfig.redirectUri,
+    redirectOrigin,
+    startMatchesRedirect: redirectOrigin
+      ? window.location.origin === redirectOrigin
+      : null,
+    writeVerified,
+    loginCount,
+  };
+  return lastLoginStartDiagnostics;
+}
+
+// 준비된 동일 authorize 요청으로 이동한다. 준비가 없거나 저장 검증 실패면 이동하지 않고 false.
+export function proceedToAuthorize() {
+  if (!preparedAuthorizeUrl) return false;
+  window.location.assign(preparedAuthorizeUrl);
+  return true;
+}
+
+// 기존 즉시 이동 흐름(비진단 모드): 준비 후 바로 이동.
+export async function login() {
+  const diag = await prepareLogin();
+  if (!diag.writeVerified) {
+    const err = new Error("로그인 준비에 실패했습니다. 브라우저 저장소를 확인해 주세요.");
+    err.diagnostics = diag;
+    throw err;
+  }
+  proceedToAuthorize();
+}
+
+// ---------- 콜백 처리 (authorize → redirect_uri?code=...&state=...) ----------
+
+// URL 에 code 가 있으면 토큰으로 교환합니다. 성공 시 true, 콜백이 아니면 false.
+export async function handleRedirectCallback() {
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get("code");
+  const returnedState = url.searchParams.get("state");
+  const errorParam = url.searchParams.get("error");
+
+  if (errorParam) {
+    cleanUrl();
+    throw new Error(`로그인에 실패했습니다 (${errorParam}).`);
+  }
+  if (!code) return false;
+
+  const callbackCount = bumpCount(CALLBACK_COUNT_KEY);
+
+  const savedState = sessionStorage.getItem(PKCE_STATE_KEY);
+  const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+  const startOrigin = (() => {
+    try {
+      return sessionStorage.getItem(START_ORIGIN_KEY);
+    } catch (e) {
+      return null;
+    }
+  })();
+  const callbackOrigin = window.location.origin;
+
+  // 검증 "전에" 민감정보 없는 진단 요약을 수집한다.
+  // 저장된 값 원문(state/verifier/code)은 담지 않고 존재 여부·일치 여부·origin·횟수만 기록한다.
+  lastAuthDiagnostics = {
+    savedStatePresent: Boolean(savedState),
+    returnedStatePresent: Boolean(returnedState),
+    stateMatches: Boolean(savedState) && savedState === returnedState,
+    verifierPresent: Boolean(verifier),
+    startOrigin: startOrigin || null,
+    callbackOrigin,
+    // 시작 origin 을 알 수 없으면(null) 불일치로 단정하지 않고 null(unknown)로 구분한다.
+    originMatches: startOrigin ? startOrigin === callbackOrigin : null,
+    loginCount: readCount(LOGIN_COUNT_KEY),
+    callbackCount,
+  };
+
+  sessionStorage.removeItem(PKCE_STATE_KEY);
+  sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+  try {
+    sessionStorage.removeItem(START_ORIGIN_KEY);
+  } catch (e) {
+    // noop
+  }
+
+  if (!savedState || savedState !== returnedState) {
+    cleanUrl();
+    const err = new Error("로그인 상태 검증에 실패했습니다. 다시 시도해 주세요.");
+    err.diagnostics = lastAuthDiagnostics;
+    throw err;
+  }
+  if (!verifier) {
+    cleanUrl();
+    const err = new Error("로그인 세션이 만료되었습니다. 다시 시도해 주세요.");
+    err.diagnostics = lastAuthDiagnostics;
+    throw err;
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: authConfig.clientId,
+    code,
+    redirect_uri: authConfig.redirectUri,
+    code_verifier: verifier,
+  });
+  const res = await fetch(tokenEndpoint(), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!res.ok) {
+    cleanUrl();
+    throw new Error("토큰 교환에 실패했습니다. 다시 로그인해 주세요.");
+  }
+  const tokens = await res.json();
+  storeTokens(tokens);
+  cleanUrl();
+  return true;
+}
+
+function storeTokens(tokens) {
+  if (tokens.access_token) {
+    accessToken = tokens.access_token;
+    const expiresInMs = (Number(tokens.expires_in) || 3600) * 1000;
+    // 만료 60초 전에 미리 갱신하도록 여유를 둠
+    accessTokenExpiry = Date.now() + expiresInMs - 60 * 1000;
+  }
+  if (tokens.refresh_token) {
+    try {
+      sessionStorage.setItem(REFRESH_KEY, tokens.refresh_token);
+    } catch (e) {
+      // 저장 실패해도 메모리 토큰으로는 동작
+    }
+  }
+}
+
+// 콜백 쿼리스트링(code, state)을 주소창에서 제거
+function cleanUrl() {
+  const base = window.location.origin + window.location.pathname;
+  window.history.replaceState({}, document.title, base);
+}
+
+// ---------- 토큰 조회/갱신 ----------
+
+async function refreshWithToken() {
+  const refreshToken = sessionStorage.getItem(REFRESH_KEY);
+  if (!refreshToken) return false;
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: authConfig.clientId,
+    refresh_token: refreshToken,
+  });
+  const res = await fetch(tokenEndpoint(), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+  if (!res.ok) {
+    clearTokens();
+    return false;
+  }
+  const tokens = await res.json();
+  storeTokens(tokens);
+  return Boolean(accessToken);
+}
+
+// 유효한 액세스 토큰을 돌려줍니다. 없거나 만료면 refresh 를 시도하고, 그래도 없으면 null.
+export async function getAccessToken() {
+  if (accessToken && Date.now() < accessTokenExpiry) return accessToken;
+  const refreshed = await refreshWithToken();
+  return refreshed ? accessToken : null;
+}
+
+export function isAuthenticated() {
+  if (accessToken && Date.now() < accessTokenExpiry) return true;
+  return Boolean(sessionStorage.getItem(REFRESH_KEY));
+}
+
+function clearTokens() {
+  accessToken = null;
+  accessTokenExpiry = 0;
+  try {
+    sessionStorage.removeItem(REFRESH_KEY);
+  } catch (e) {
+    // noop
+  }
+}
+
+// ---------- 로그아웃 (Cognito 세션까지 종료) ----------
+
+export function logout() {
+  clearTokens();
+  const params = new URLSearchParams({
+    client_id: authConfig.clientId,
+    logout_uri: authConfig.logoutUri,
+  });
+  window.location.assign(`${logoutEndpoint()}?${params.toString()}`);
+}

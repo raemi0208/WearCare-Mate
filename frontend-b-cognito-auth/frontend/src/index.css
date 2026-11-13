@@ -1,0 +1,57 @@
+/* WearCare Mate - 전역 스타일
+ *
+ * 디자인 토큰(색상 · 글꼴 · 라운드 · 간격)은 public/theme.css 한 곳에서 관리합니다.
+ * theme.css는 public/index.html의 <link>로 로드되며, 로그인 페이지(login.html)와
+ * 동일한 토큰을 공유합니다. 토큰을 바꿀 때는 이 파일이 아니라 theme.css를 수정하세요.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-faint);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-bg);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
