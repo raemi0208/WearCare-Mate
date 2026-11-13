@@ -121,7 +121,7 @@ export default function TodayStepsCard() {
             {editing ? "입력 닫기" : record ? "오늘 기록 수정" : "오늘 기록 입력"}
           </button>
           <button type="button" className="btn" aria-expanded={preview} onClick={() => setPreview(!preview)}>
-            {preview ? "이메일 미리보기 닫기" : "이메일 리포트 설정"}
+            {preview ? "이메일 설정 닫기" : "이메일 리포트 설정"}
           </button>
         </div>
         {editing && (
@@ -141,17 +141,26 @@ export default function TodayStepsCard() {
         )}
         {preview && (
           <form className="today-report__section" aria-label="이메일 리포트 설정" onSubmit={saveSchedule}>
-            <div className="today-report__actions">
-              <label><input type="checkbox" checked={enabled} disabled={!connected || busy} onChange={(event) => setEnabled(event.target.checked)} /> 매일 받기</label>
-              <label>받을 시간 (한국 시간) <input className="form__input" type="time" value={time}
-                required disabled={!connected || !enabled || busy} onChange={(event) => setTime(event.target.value)} /></label>
+            <div className="today-report__schedule">
+              <label className="today-report__toggle">
+                <input type="checkbox" role="switch" checked={enabled} disabled={!connected || busy}
+                  onChange={(event) => setEnabled(event.target.checked)} />
+                <span>매일 이메일로 받기</span>
+              </label>
+              <label className="today-report__time">
+                <span>발송 시간 <small>한국 시간</small></span>
+                <input className="form__input" type="time" value={time} required
+                  disabled={!connected || !enabled || busy} onChange={(event) => setTime(event.target.value)} />
+              </label>
+              <button type="submit" className="btn btn--primary" disabled={!connected || busy}>
+                {busy ? "저장 중…" : "저장"}
+              </button>
             </div>
-            <button type="submit" className="btn btn--primary" disabled={!connected || busy}>수신 설정 저장</button>
             <p className="ui-note">{connected
               ? "예약 시각에 오늘 기록이 있으면 계정의 인증된 이메일로 발송합니다."
               : "이메일 예약은 인증된 발표 환경에서 사용할 수 있습니다."}</p>
             {notice && <p className="ui-note" role="status">{notice}</p>}
-            <p>{record
+            <p className="today-report__preview ui-note">{record
               ? number.format(record.steps) + "걸음 · 목표 " + number.format(percentage) + "% · 수면 " + sleep
               : "오늘 기록을 입력하면 이메일 내용을 미리 볼 수 있습니다."}</p>
           </form>
