@@ -7,6 +7,7 @@ import AiGuide from "../components/AiGuide";
 import Notifications from "../components/Notifications";
 import DatasetSummaryCards from "../components/DatasetSummaryCards";
 import DemoBanner from "../components/DemoBanner";
+import TodayStepsCard from "../components/TodayStepsCard";
 
 export default function DashboardPage({ data, onRegenerate, regenerating, demoActive = false, demoReferenceDate = null, onHideNotification }) {
   // 분석 기준일/이상 탐지 카드는 가상 결과(anomalies)를 설명하는 영역이다.
@@ -16,6 +17,7 @@ export default function DashboardPage({ data, onRegenerate, regenerating, demoAc
   return (
     <>
       <DemoBanner demoActive={demoActive} demoReferenceDate={demoReferenceDate} />
+      <TodayStepsCard />
       {data.analysis && (
         <div className="card" style={{ padding: 16 }}>
           <p>분석 기준일: {displayReferenceDate}</p>
