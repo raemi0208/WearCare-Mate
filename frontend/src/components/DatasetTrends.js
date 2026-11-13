@@ -86,11 +86,11 @@ const barStyles = {
 // ---------------------------------------------------------------------------
 // 수면 시간 분포
 // ---------------------------------------------------------------------------
-export function SleepDistribution({ sleepSummary, tabs }) {
+function SleepDistribution({ sleepSummary }) {
   const msg = statusMessage(sleepSummary);
   if (msg) {
     return (
-      <Card icon="🌙" title="수면 시간 분포" action={tabs ? <div className="chart__tabs">{datasetBadge}{tabs}</div> : datasetBadge}>
+      <Card icon="🌙" title="수면 시간 분포" action={datasetBadge}>
         <p className="ui-note" role="status">{msg}</p>
         <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
           {DATASET_DESC}
@@ -103,7 +103,7 @@ export function SleepDistribution({ sleepSummary, tabs }) {
   // ok 라도 확장 필드가 없으면 호환 안내(이전 배포 API).
   if (!Array.isArray(distribution)) {
     return (
-      <Card icon="🌙" title="수면 시간 분포" action={tabs ? <div className="chart__tabs">{datasetBadge}{tabs}</div> : datasetBadge}>
+      <Card icon="🌙" title="수면 시간 분포" action={datasetBadge}>
         <p className="ui-note" role="status">확장 집계가 제공되지 않았습니다.</p>
         <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
           {DATASET_DESC}
@@ -131,7 +131,7 @@ if (
   sumMismatch
 ) {
      return (
-      <Card icon="🌙" title="수면 시간 분포" action={tabs ? <div className="chart__tabs">{datasetBadge}{tabs}</div> : datasetBadge}>
+      <Card icon="🌙" title="수면 시간 분포" action={datasetBadge}>
         <p role="alert">수면 분포 집계가 올바르지 않아 차트를 표시하지 않습니다.</p>
         <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
           {invalidBucket
@@ -150,7 +150,7 @@ if (
   const maxCount = counts.length ? Math.max(...counts) : 0;
 
   return (
-    <Card icon="🌙" title="수면 시간 분포" action={tabs ? <div className="chart__tabs">{datasetBadge}{tabs}</div> : datasetBadge}>
+    <Card icon="🌙" title="수면 시간 분포" action={datasetBadge}>
       <div className="trend-stats">
         <div className="trend-stat">
           <span className="trend-stat__label">평균</span>
@@ -201,13 +201,13 @@ if (
 // ---------------------------------------------------------------------------
 // 날짜별 평균 심박
 // ---------------------------------------------------------------------------
-export function HeartDaily({ heartSummary, tabs }) {
+function HeartDaily({ heartSummary }) {
   const [showRows, setShowRows] = useState(false);
   const msg = statusMessage(heartSummary);
 
   if (msg) {
     return (
-      <Card icon="❤️" title="날짜별 평균 심박" action={tabs ? <div className="chart__tabs">{datasetBadge}{tabs}</div> : datasetBadge}>
+      <Card icon="❤️" title="날짜별 평균 심박" action={datasetBadge}>
         <p className="ui-note" role="status">{msg}</p>
         <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
           {DATASET_DESC}
@@ -219,7 +219,7 @@ export function HeartDaily({ heartSummary, tabs }) {
   const dailySeries = heartSummary.dailySeries;
   if (!Array.isArray(dailySeries)) {
     return (
-      <Card icon="❤️" title="날짜별 평균 심박" action={tabs ? <div className="chart__tabs">{datasetBadge}{tabs}</div> : datasetBadge}>
+      <Card icon="❤️" title="날짜별 평균 심박" action={datasetBadge}>
         <p className="ui-note" role="status">확장 집계가 제공되지 않았습니다.</p>
         <p style={{ fontSize: 12, color: "var(--color-muted)", margin: "8px 0 0" }}>
           {DATASET_DESC}
@@ -250,7 +250,7 @@ export function HeartDaily({ heartSummary, tabs }) {
   }[heartSummary.averageBasis];
 
   return (
-    <Card icon="❤️" title="날짜별 평균 심박" action={tabs ? <div className="chart__tabs">{datasetBadge}{tabs}</div> : datasetBadge}>
+    <Card icon="❤️" title="날짜별 평균 심박" action={datasetBadge}>
       <div className="trend-stats">
         <div className="trend-stat">
           <span className="trend-stat__label">전체 평균 심박</span>

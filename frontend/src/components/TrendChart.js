@@ -1,53 +1,16 @@
-import React, { useState } from "react";
+import React from "react";
 import Card from "./ui/Card";
-import { SleepDistribution, HeartDaily } from "./DatasetTrends";
 import LineChart from "./ui/LineChart";
 
-const TABS = [
-  { id: "sleep", label: "수면", unit: "시간" },
-  { id: "heartRate", label: "심박", unit: "bpm" },
-  { id: "steps", label: "활동량", unit: "걸음" },
-];
-
-export default function TrendChart({ timeseries, sleepSummary, heartSummary }) {
-  const [tab, setTab] = useState(() => TABS.find((t) => timeseries[t.id]?.length)?.id || "steps");
-  const current = TABS.find((t) => t.id === tab);
-  const data = timeseries[tab] || [];
-  const hasAnomaly = data.some((d) => d.anomaly);
-
-  const tabs = (
-    <div className="chart__tabs">
-      {TABS.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          className={`chart__tab ${tab === t.id ? "is-active" : ""}`.trim()}
-          aria-pressed={tab === t.id}
-          onClick={() => setTab(t.id)}
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
-  );
-
-  if (tab === "sleep" && !data.length && sleepSummary) {
-    return <SleepDistribution sleepSummary={sleepSummary} tabs={tabs} />;
-  }
-  if (tab === "heartRate" && !data.length && heartSummary) {
-    return <HeartDaily heartSummary={heartSummary} tabs={tabs} />;
-  }
+export default function TrendChart({ steps = [] }) {
+  const hasAnomaly = steps.some((point) => point.anomaly);
 
   return (
-    <Card
-      icon="📈" title="시계열 추이"
-      subtitle={`조회된 기준 주의 ${current.label} 기록 (단위: ${current.unit})`}
-      action={tabs}
-    >
+    <Card icon="📈" title="시계열 추이" subtitle="조회된 기준 주의 활동량 기록 (단위: 걸음)">
       <div className="chart__legend">
         <span className="chart__legend-item">
           <span className="chart__swatch" style={{ background: "#141414" }} />
-          일별 측정값
+          일별 걸음 수
         </span>
         {hasAnomaly && (
           <span className="chart__legend-item">
@@ -56,7 +19,7 @@ export default function TrendChart({ timeseries, sleepSummary, heartSummary }) {
           </span>
         )}
       </div>
-      <LineChart data={data} />
+      <LineChart data={steps} />
     </Card>
   );
 }

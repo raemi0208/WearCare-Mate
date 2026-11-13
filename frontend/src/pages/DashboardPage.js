@@ -34,8 +34,7 @@ export default function DashboardPage({ data, onRegenerate, regenerating, demoAc
 
       <DatasetSummaryCards data={data} />
 
-      <TrendChart timeseries={data.timeseries} sleepSummary={data.sleepDatasetSummary}
-        heartSummary={data.heartRateDatasetSummary} />
+      <TrendChart steps={data.timeseries?.steps} />
       <SleepStages sleepStages={data.sleepStages} sleepSummary={data.sleepDatasetSummary} />
       <AnomalyPanel
         anomalies={data.anomalies}
