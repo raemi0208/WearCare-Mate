@@ -1372,3 +1372,62 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+
+.personal-history__summary {
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: rgba(20, 20, 20, 0.04);
+}
+
+.personal-history__summary p {
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+}
+
+.personal-history__summary .trend-stats {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.personal-history__table {
+  margin-top: 24px;
+  overflow-x: auto;
+}
+
+.personal-history__table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.personal-history__table caption {
+  padding-bottom: 8px;
+  text-align: left;
+  font-weight: 700;
+}
+
+.personal-history__table th,
+.personal-history__table td {
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(20, 20, 20, 0.12);
+}
+
+.personal-history__bar {
+  display: block;
+  width: min(100%, 8rem);
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 6px;
+  background: rgba(20, 20, 20, 0.12);
+  overflow: hidden;
+}
+
+.personal-history__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #141414;
+}
