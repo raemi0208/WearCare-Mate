@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Card from "./ui/Card";
+import { SleepDistribution, HeartDaily } from "./DatasetTrends";
 import LineChart from "./ui/LineChart";
 
 const TABS = [
@@ -8,7 +9,7 @@ const TABS = [
   { id: "steps", label: "활동량", unit: "걸음" },
 ];
 
-export default function TrendChart({ timeseries }) {
+export default function TrendChart({ timeseries, sleepSummary, heartSummary }) {
   const [tab, setTab] = useState(() => TABS.find((t) => timeseries[t.id]?.length)?.id || "steps");
   const current = TABS.find((t) => t.id === tab);
   const data = timeseries[tab] || [];
@@ -21,6 +22,7 @@ export default function TrendChart({ timeseries }) {
           key={t.id}
           type="button"
           className={`chart__tab ${tab === t.id ? "is-active" : ""}`.trim()}
+          aria-pressed={tab === t.id}
           onClick={() => setTab(t.id)}
         >
           {t.label}
@@ -28,6 +30,13 @@ export default function TrendChart({ timeseries }) {
       ))}
     </div>
   );
+
+  if (tab === "sleep" && !data.length && sleepSummary) {
+    return <SleepDistribution sleepSummary={sleepSummary} tabs={tabs} />;
+  }
+  if (tab === "heartRate" && !data.length && heartSummary) {
+    return <HeartDaily heartSummary={heartSummary} tabs={tabs} />;
+  }
 
   return (
     <Card
